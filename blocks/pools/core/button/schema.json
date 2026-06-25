@@ -1,0 +1,14 @@
+{
+  "required": ["label", "variant"],
+  "properties": {
+    "label": {
+      "type": "string"
+    },
+    "href": {
+      "type": "string"
+    },
+    "variant": {
+      "enum": ["primary", "secondary"]
+    }
+  }
+}

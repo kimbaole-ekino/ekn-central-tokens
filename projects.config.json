@@ -1,0 +1,16 @@
+{
+  "projects": [
+    {
+      "id": "project-a",
+      "tokenFile": "token-definitions/projects/project-a/tokens.json",
+      "outputDir": "dist/project-a",
+      "blockPools": ["core"]
+    },
+    {
+      "id": "project-b",
+      "tokenFile": "token-definitions/projects/project-b/tokens.json",
+      "outputDir": "dist/project-b",
+      "blockPools": ["core"]
+    }
+  ]
+}

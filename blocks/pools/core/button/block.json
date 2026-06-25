@@ -1,0 +1,17 @@
+{
+  "id": "button",
+  "displayName": "Button",
+  "variants": ["primary", "secondary"],
+  "props": {
+    "label": "string",
+    "href": "string",
+    "variant": ["primary", "secondary"]
+  },
+  "slots": {},
+  "tokens": ["button.background.primary", "button.padding.x"],
+  "template": "template.html",
+  "accessibility": {
+    "requiresAccessibleName": true,
+    "keyboardInteraction": "native-link-or-button"
+  }
+}
