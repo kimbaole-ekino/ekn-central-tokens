@@ -11,6 +11,12 @@
       "tokenFile": "token-definitions/projects/project-b/tokens.json",
       "outputDir": "dist/project-b",
       "blockPools": ["core"]
+    },
+    {
+      "id": "project-c",
+      "tokenFile": "token-definitions/projects/project-c/tokens.json",
+      "outputDir": "dist/project-c",
+      "blockPools": ["core"]
     }
   ]
 }
