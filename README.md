@@ -33,6 +33,7 @@ blocks/
 scripts/
   token-build-utils.mjs
   validate-token-projects.mjs
+  detect-affected-token-projects.mjs
   build-token-artifacts.mjs
   check-stale-token-pr.mjs
   create-target-merge-requests.mjs
@@ -79,6 +80,12 @@ Build generated artifacts:
 npm run build:artifacts
 ```
 
+Build one affected project:
+
+```bash
+TOKEN_PROJECTS=project-c npm run build:artifacts
+```
+
 Run the token processing build boundary directly:
 
 ```bash
@@ -114,7 +121,7 @@ npm run validate
 `npm run validate:tokens`:
 
 ```text
-Validated 2 token project(s).
+Validated 2 token file(s); 0 pending first sync project(s).
 ```
 
 `npm run build:artifacts`:
@@ -123,6 +130,10 @@ Validated 2 token project(s).
 Built project-a into dist/project-a
 Built project-b into dist/project-b
 ```
+
+If a project is configured before its first plugin-submitted `tokens.json`
+exists, validation reports it as pending and build/delivery skip only that
+project until the first plugin PR/MR creates the file.
 
 `npm run delivery:target-mr`:
 
@@ -152,6 +163,7 @@ Start with:
 
 - `docs/repository-structure.md`
 - `docs/ci-cd.md`
+- `docs/affected-project-ci.md`
 - `docs/style-dictionary-build.md`
 - `docs/generated-artifacts.md`
 - `docs/release-workflow.md`

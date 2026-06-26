@@ -58,6 +58,18 @@ Full artifact command:
 npm run build:artifacts
 ```
 
+Build a selected project:
+
+```bash
+TOKEN_PROJECTS=project-c npm run build:artifacts
+```
+
+or:
+
+```bash
+npm run build:artifacts -- --project=project-c
+```
+
 Current implementation:
 
 ```text
@@ -69,6 +81,9 @@ style-dictionary
 The build currently:
 
 - validates each token document,
+- skips projects whose `tokens.json` has not been created by the first plugin
+  PR/MR yet,
+- supports affected-project build filtering,
 - requires `tokens.json.$themes`,
 - derives theme builds from each theme's `selectedTokenSets`,
 - flattens selected token sets by theme,

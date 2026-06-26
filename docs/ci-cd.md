@@ -10,7 +10,7 @@ change can be merged and delivered.
 | Workflow | Trigger | Purpose |
 | --- | --- | --- |
 | `.github/workflows/token-ci.yml` | Pull request, manual dispatch | Validate token sources and build artifacts. |
-| `.github/workflows/target-delivery.yml` | Manual dispatch | Build artifacts and create target project PRs/MRs when apply mode is selected. |
+| `.github/workflows/target-delivery.yml` | Push to `main`, manual dispatch | Build affected artifacts and create target project PRs/MRs. |
 
 Both workflows run `npm ci` before repository scripts so CI uses the locked
 `style-dictionary` dependency from `package-lock.json`.
@@ -21,10 +21,11 @@ Both workflows run `npm ci` before repository scripts so CI uses the locked
 1. Figma plugin creates a branch and PR.
 2. CI validates token files.
 3. CI checks stale token baseline state when SHA inputs are available.
-4. CI builds generated artifacts.
-5. CI uploads `dist/` as an artifact.
-6. Maintainer reviews token source and generated artifact output.
-7. PR is merged only after checks pass.
+4. CI detects affected token projects.
+5. CI builds generated artifacts for affected projects.
+6. CI uploads `dist/` as an artifact.
+7. Maintainer reviews token source and generated artifact output.
+8. PR is merged only after checks pass.
 ```
 
 ## Build Timing
@@ -33,7 +34,8 @@ PR build is a validation gate only:
 
 - validate `tokens.json`,
 - validate `projects.config.json` and `targets.config.json`,
-- prove Style Dictionary can build the project,
+- detect affected token projects,
+- prove Style Dictionary can build the affected projects,
 - optionally upload `dist/` as a temporary workflow artifact.
 
 The PR build output is not the durable release artifact and is not pushed to
@@ -44,9 +46,14 @@ The durable build/delivery boundary starts after merge to `main`:
 ```text
 token PR merged into main
 -> build artifacts from merged main
--> target delivery workflow creates target project PR/MR
+-> target delivery workflow detects affected projects
+-> target delivery workflow creates target project PR/MR for affected projects
 -> target maintainer reviews and merges
 ```
+
+Manual target delivery can still be run from GitHub Actions. Its `dry_run`
+input defaults to true, so manual runs validate and print delivery unless
+`dry_run` is set to false.
 
 Do not commit generated `dist/` output back to this repository as normal source.
 `dist/` is rebuildable.
@@ -68,8 +75,7 @@ npm run build:artifacts
 npm run delivery:target-mr
 ```
 
-`build:artifacts` delegates token processing to the Style Dictionary build
-boundary:
+`build:artifacts` runs the Style Dictionary build boundary:
 
 ```bash
 npm run build:style-dictionary
@@ -78,7 +84,7 @@ npm run build:style-dictionary
 Expected output:
 
 ```text
-Validated 2 token project(s).
+Validated 2 token file(s); 1 pending first sync project(s).
 Skipping stale token PR check: BASELINE_TOKEN_FILE_SHA and LATEST_TOKEN_FILE_SHA are not both set.
 Built project-a into dist/project-a
 Built project-b into dist/project-b
@@ -87,6 +93,12 @@ Mode: dry-run
 Target delivery MR for project-b
 Mode: dry-run
 ```
+
+Pull request CI narrows the artifact build with affected-project detection.
+For example, a change under
+`token-definitions/projects/project-c/tokens.json` builds `project-c` only.
+Shared build changes such as `scripts/**`, `package.json`, or
+`.github/workflows/token-ci.yml` intentionally rebuild all projects.
 
 ## Stale PR Check
 
@@ -136,10 +148,34 @@ CI should block merge on:
 - failed artifact build,
 - stale baseline mismatch when SHA inputs are present.
 
+## First Sync Projects
+
+A developer may register a new project in `projects.config.json` and
+`targets.config.json` before the Figma plugin has created that project's
+`tokens.json`.
+
+In that pre-first-sync state:
+
+- `npm run validate:tokens` validates the project and target configuration,
+- missing `tokenFile` paths are reported as pending first sync,
+- missing `tokenFile` paths do not fail token validation,
+- `npm run build:artifacts` skips the pending project because there is no
+  token source to build yet,
+- `npm run delivery:target-mr` skips target delivery for the pending project
+  because no built artifact can exist yet.
+
+Expected pre-first-sync output:
+
+```text
+Skipping {project}: token-definitions/projects/{project}/tokens.json does not exist yet. It will be created by the first plugin PR/MR.
+Validated 2 token file(s); 1 pending first sync project(s).
+Skipping build for {project}: token-definitions/projects/{project}/tokens.json does not exist yet. It will be created by the first plugin PR/MR.
+Skipping target delivery for {project}: token-definitions/projects/{project}/tokens.json does not exist yet. It will be created by the first plugin PR/MR.
+```
+
 ## Future CI Improvements
 
 - Inject real baseline/latest token file SHAs into the workflow.
-- Add affected-project detection.
 - Add block example schema validation.
 - Add artifact snapshot checks.
 - Add deterministic versioning from commit SHA.

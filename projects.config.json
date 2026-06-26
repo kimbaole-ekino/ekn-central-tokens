@@ -11,6 +11,12 @@
       "tokenFile": "token-definitions/projects/project-b/tokens.json",
       "outputDir": "dist/project-b",
       "blockPools": ["core"]
+    },
+    {
+      "id": "ekn-design-tokens-target",
+      "tokenFile": "token-definitions/projects/ekn-design-tokens-target/tokens.json",
+      "outputDir": "dist/ekn-design-tokens-target",
+      "blockPools": ["core"]
     }
   ]
 }

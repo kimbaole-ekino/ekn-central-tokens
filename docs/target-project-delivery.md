@@ -46,7 +46,19 @@ npm run delivery:target-mr -- --project=project-a
 
 ## Workflow
 
-`.github/workflows/target-delivery.yml` provides a manual workflow.
+`.github/workflows/target-delivery.yml` runs automatically after changes are
+merged to `main`.
+
+Automatic mode:
+
+```text
+central token PR merged to main
+-> detect affected token projects
+-> rebuild affected artifacts from merged source
+-> create or update target project PRs/MRs
+```
+
+The workflow also supports manual dispatch.
 
 Default mode:
 
@@ -54,8 +66,8 @@ Default mode:
 dry_run: true
 ```
 
-This builds artifacts and prints the target delivery work without writing to
-external repositories.
+For manual dispatch, this builds artifacts and prints the target delivery work
+without writing to external repositories.
 
 Apply mode:
 
@@ -63,7 +75,8 @@ Apply mode:
 dry_run: false
 ```
 
-This builds artifacts and creates or updates target project PRs/MRs using the
+For automatic `main` pushes and manual dispatch with `dry_run: false`, this
+builds artifacts and creates or updates target project PRs/MRs using the
 `TARGET_REPOSITORY_TOKEN` repository secret.
 
 ## Required Secret
@@ -242,7 +255,10 @@ Current status:
 
 - dry-run mode works locally without credentials after artifacts are built,
 - apply mode uses `gh`, `git`, and `GH_TOKEN`/`GITHUB_TOKEN`,
-- the GitHub Actions apply path requires `TARGET_REPOSITORY_TOKEN`,
+- the GitHub Actions apply path runs after pushes to `main` and requires
+  `TARGET_REPOSITORY_TOKEN`,
+- target delivery is scoped by affected project when the workflow is triggered
+  by a `main` push,
 - target maintainers still review and merge the target PR/MR,
 - `project-a` and `project-b` currently use placeholder repos and must be
   replaced before apply mode can work for them.
