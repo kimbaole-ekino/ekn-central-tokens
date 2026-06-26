@@ -114,7 +114,7 @@ npm run validate
 `npm run validate:tokens`:
 
 ```text
-Validated 2 token project(s).
+Validated 2 token file(s); 0 pending first sync project(s).
 ```
 
 `npm run build:artifacts`:
@@ -123,6 +123,10 @@ Validated 2 token project(s).
 Built project-a into dist/project-a
 Built project-b into dist/project-b
 ```
+
+If a project is configured before its first plugin-submitted `tokens.json`
+exists, validation reports it as pending and build/delivery skip only that
+project until the first plugin PR/MR creates the file.
 
 `npm run delivery:target-mr`:
 

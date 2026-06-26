@@ -69,6 +69,8 @@ style-dictionary
 The build currently:
 
 - validates each token document,
+- skips projects whose `tokens.json` has not been created by the first plugin
+  PR/MR yet,
 - requires `tokens.json.$themes`,
 - derives theme builds from each theme's `selectedTokenSets`,
 - flattens selected token sets by theme,

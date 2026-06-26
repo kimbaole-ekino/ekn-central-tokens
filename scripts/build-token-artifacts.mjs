@@ -14,6 +14,12 @@ const config = getProjectsConfig(rootDir);
 
 for (const project of config.projects ?? []) {
   const tokenPath = path.join(rootDir, project.tokenFile);
+  if (!fs.existsSync(tokenPath)) {
+    console.log(
+      `Skipping build for ${project.id}: ${project.tokenFile} does not exist yet. It will be created by the first plugin PR/MR.`,
+    );
+    continue;
+  }
   const tokens = readJson(tokenPath);
   validateTokenDocument(tokens, project.tokenFile);
   const themes = getThemesFromTokenDocument(project, tokens);

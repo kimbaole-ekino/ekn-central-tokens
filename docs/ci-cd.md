@@ -136,6 +136,31 @@ CI should block merge on:
 - failed artifact build,
 - stale baseline mismatch when SHA inputs are present.
 
+## First Sync Projects
+
+A developer may register a new project in `projects.config.json` and
+`targets.config.json` before the Figma plugin has created that project's
+`tokens.json`.
+
+In that pre-first-sync state:
+
+- `npm run validate:tokens` validates the project and target configuration,
+- missing `tokenFile` paths are reported as pending first sync,
+- missing `tokenFile` paths do not fail token validation,
+- `npm run build:artifacts` skips the pending project because there is no
+  token source to build yet,
+- `npm run delivery:target-mr` skips target delivery for the pending project
+  because no built artifact can exist yet.
+
+Expected pre-first-sync output:
+
+```text
+Skipping {project}: token-definitions/projects/{project}/tokens.json does not exist yet. It will be created by the first plugin PR/MR.
+Validated 2 token file(s); 1 pending first sync project(s).
+Skipping build for {project}: token-definitions/projects/{project}/tokens.json does not exist yet. It will be created by the first plugin PR/MR.
+Skipping target delivery for {project}: token-definitions/projects/{project}/tokens.json does not exist yet. It will be created by the first plugin PR/MR.
+```
+
 ## Future CI Improvements
 
 - Inject real baseline/latest token file SHAs into the workflow.

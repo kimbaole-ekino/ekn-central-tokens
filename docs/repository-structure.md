@@ -53,6 +53,10 @@ ekn-central-tokens/
 | `.github/workflows/` | Central token repo | CI and manual target delivery workflows. |
 | `dist/` | Generated | Build output. Ignored by Git. |
 
+`projects.config.json` and `targets.config.json` may be committed before a new
+project's `tokens.json` exists. The first Figma plugin sync creates that token
+file through a reviewed PR/MR.
+
 ## Token Source Contract
 
 Each normal project has one plugin-submitted token document:

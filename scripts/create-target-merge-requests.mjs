@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { getTargetsConfig } from "./token-build-utils.mjs";
+import {
+  getProjectsConfig,
+  getTargetsConfig,
+} from "./token-build-utils.mjs";
 
 const rootDir = process.cwd();
 const args = new Set(process.argv.slice(2));
@@ -10,6 +13,10 @@ const isApplyMode =
 const selectedProject =
   getArgValue("--project") ?? process.env.TARGET_DELIVERY_PROJECT ?? "";
 const config = getTargetsConfig(rootDir);
+const projectsConfig = getProjectsConfig(rootDir);
+const projectById = new Map(
+  (projectsConfig.projects ?? []).map((project) => [project.id, project]),
+);
 const targets = (config.targets ?? []).filter(
   (target) => !selectedProject || target.project === selectedProject,
 );
@@ -33,7 +40,14 @@ if (isApplyMode) {
 }
 
 for (const target of targets) {
-  validateTarget(target);
+  const project = validateTarget(target);
+  if (isPendingFirstSyncProject(project)) {
+    console.log(
+      `Skipping target delivery for ${target.project}: ${project.tokenFile} does not exist yet. It will be created by the first plugin PR/MR.`,
+    );
+    continue;
+  }
+  validateBuiltArtifacts(target);
   const delivery = buildDelivery(target);
   printDelivery(delivery, isApplyMode ? "apply" : "dry-run");
 
@@ -64,6 +78,24 @@ function validateTarget(target) {
     }
   }
 
+  const project = projectById.get(target.project);
+  if (!project) {
+    throw new Error(`${target.project} does not exist in projects.config.json.`);
+  }
+  if (target.source !== project.outputDir) {
+    throw new Error(
+      `${target.project} source must match projects.config.json outputDir (${project.outputDir}).`,
+    );
+  }
+
+  return project;
+}
+
+function isPendingFirstSyncProject(project) {
+  return !fs.existsSync(path.join(rootDir, project.tokenFile));
+}
+
+function validateBuiltArtifacts(target) {
   const sourceDir = path.join(rootDir, target.source);
   const manifestPath = path.join(sourceDir, "manifest.json");
   if (!fs.existsSync(manifestPath)) {
