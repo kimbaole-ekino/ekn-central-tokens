@@ -1,0 +1,14 @@
+{
+  "required": ["title", "description", "variant"],
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "variant": {
+      "enum": ["centered", "image-right"]
+    }
+  }
+}

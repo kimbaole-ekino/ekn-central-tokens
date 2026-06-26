@@ -1,0 +1,20 @@
+{
+  "name": "ekn-central-tokens",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "validate": "npm run validate:tokens && npm run check:stale-token-pr && npm run build:artifacts && npm run delivery:target-mr",
+    "validate:tokens": "node scripts/validate-token-projects.mjs",
+    "build:style-dictionary": "node scripts/build-token-artifacts.mjs",
+    "build:artifacts": "npm run build:style-dictionary",
+    "check:stale-token-pr": "node scripts/check-stale-token-pr.mjs",
+    "delivery:target-mr": "node scripts/create-target-merge-requests.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "style-dictionary": "^4.4.0"
+  }
+}

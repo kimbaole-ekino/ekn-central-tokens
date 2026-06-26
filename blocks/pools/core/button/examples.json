@@ -1,0 +1,12 @@
+{
+  "examples": [
+    {
+      "type": "button",
+      "props": {
+        "label": "Learn more",
+        "href": "/docs",
+        "variant": "primary"
+      }
+    }
+  ]
+}

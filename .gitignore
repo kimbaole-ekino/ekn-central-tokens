@@ -1,0 +1,55 @@
+# Dependencies and package manager state
+node_modules/
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+.npm/
+.pnpm-store/
+
+# Generated build outputs
+dist/
+build/
+out/
+artifacts/
+coverage/
+*.log
+
+# Environment variables
+.env
+.env.*
+!.env.example
+.env.development
+.env.production
+.env.local
+.env.*.local
+
+# Caches and temporary files
+.cache/
+.tmp/
+tmp/
+temp/
+.vite/
+.vitest/
+.nyc_output/
+.eslintcache
+.style-dictionary/
+
+# Logs
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE and OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Local delivery scratch space
+.delivery/
+.release/
