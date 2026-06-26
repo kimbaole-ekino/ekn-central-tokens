@@ -33,6 +33,16 @@
         "branchPrefix": "tokens/",
         "labels": []
       }
+    },
+    {
+      "project": "ekn-design-tokens-target",
+      "repo": "https://github.com/kimbaole-ekino/ekn-design-tokens-target",
+      "branch": "main",
+      "source": "dist/ekn-design-tokens-target",
+      "destination": {
+        "css": "src/styles/tokens",
+        "html": "src/static/blocks"
+      }
     }
   ]
 }
