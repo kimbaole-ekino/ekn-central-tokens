@@ -36,7 +36,7 @@
     },
     {
       "project": "ekn-design-tokens-target",
-      "repo": "https://github.com/kimbaole-ekino/ekn-design-tokens-target",
+      "repo": "https://github.com/KimBao1306/ekn-design-tokens-target",
       "branch": "main",
       "source": "dist/ekn-design-tokens-target",
       "destination": {
