@@ -6,8 +6,9 @@
   "scripts": {
     "validate": "npm run validate:tokens && npm run check:stale-token-pr && npm run build:artifacts && npm run delivery:target-mr",
     "validate:tokens": "node scripts/validate-token-projects.mjs",
+    "detect:affected-projects": "node scripts/detect-affected-token-projects.mjs",
     "build:style-dictionary": "node scripts/build-token-artifacts.mjs",
-    "build:artifacts": "npm run build:style-dictionary",
+    "build:artifacts": "node scripts/build-token-artifacts.mjs",
     "check:stale-token-pr": "node scripts/check-stale-token-pr.mjs",
     "delivery:target-mr": "node scripts/create-target-merge-requests.mjs"
   },
