@@ -1,6 +1,18 @@
 name: Target Delivery
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "token-definitions/**"
+      - "blocks/**"
+      - "projects.config.json"
+      - "targets.config.json"
+      - "scripts/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/target-delivery.yml"
   workflow_dispatch:
     inputs:
       project:
@@ -20,19 +32,29 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Detect affected token projects
+        if: github.event_name == 'push'
+        run: node scripts/detect-affected-token-projects.mjs --base=${{ github.event.before }} --head=${{ github.sha }}
+      - name: Select requested project
+        if: github.event_name == 'workflow_dispatch' && inputs.project != ''
+        run: |
+          echo "TOKEN_PROJECTS=${{ inputs.project }}" >> "$GITHUB_ENV"
+          echo "TARGET_DELIVERY_PROJECTS=${{ inputs.project }}" >> "$GITHUB_ENV"
       - run: npm run build:artifacts
       - name: Dry-run target delivery
-        if: ${{ inputs.dry_run }}
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run
         run: npm run delivery:target-mr
         env:
           TARGET_DELIVERY_PROJECT: ${{ inputs.project }}
       - name: Create target pull requests
-        if: ${{ !inputs.dry_run }}
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run)
         run: npm run delivery:target-mr -- --apply
         env:
           TARGET_DELIVERY_PROJECT: ${{ inputs.project }}

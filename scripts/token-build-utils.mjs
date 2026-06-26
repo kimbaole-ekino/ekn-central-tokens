@@ -99,6 +99,7 @@ export function validateTokenDocument(document, sourceName) {
   const errors = [];
   const stableIds = new Map();
   const tokenSets = new Set(getTokenSetNames(document));
+  const allTokens = flattenTokens(document);
 
   if (!Array.isArray(document.$themes) || document.$themes.length === 0) {
     errors.push("root: missing non-empty $themes array");
@@ -173,7 +174,13 @@ export function validateTokenDocument(document, sourceName) {
       try {
         resolveAlias(getLeafValue(leaf), flattened);
       } catch (error) {
-        errors.push(`${theme.id}:${tokenPath}: ${error.message}`);
+        errors.push(
+          `${theme.id}:${tokenPath}: ${formatAliasError(
+            error,
+            allTokens,
+            selectedSets,
+          )}`,
+        );
       }
     }
   }
@@ -181,6 +188,20 @@ export function validateTokenDocument(document, sourceName) {
   if (errors.length > 0) {
     throw new Error(`${sourceName} failed validation:\n${errors.join("\n")}`);
   }
+}
+
+function formatAliasError(error, allTokens, selectedSets) {
+  const message = error instanceof Error ? error.message : String(error);
+  const match = message.match(/^Unresolved alias: (.+)$/);
+  if (!match) return message;
+
+  const aliasPath = match[1];
+  const target = allTokens.get(aliasPath);
+  if (!target) return message;
+
+  const targetSet = aliasPath.split(".")[0];
+  const activeSets = selectedSets.length > 0 ? selectedSets.join(", ") : "none";
+  return `${message}; ${targetSet} exists but is not active for this theme (active sets: ${activeSets})`;
 }
 
 export function renderTemplate(template, props, slots = {}) {

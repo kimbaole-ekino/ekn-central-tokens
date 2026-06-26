@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { getTargetsConfig } from "./token-build-utils.mjs";
+import {
+  getProjectsConfig,
+  getTargetsConfig,
+} from "./token-build-utils.mjs";
 
 const rootDir = process.cwd();
 const args = new Set(process.argv.slice(2));
@@ -9,10 +12,21 @@ const isApplyMode =
   args.has("--apply") || process.env.TARGET_DELIVERY_APPLY === "true";
 const selectedProject =
   getArgValue("--project") ?? process.env.TARGET_DELIVERY_PROJECT ?? "";
+const selectedProjects = getSelectedProjectIds();
 const config = getTargetsConfig(rootDir);
-const targets = (config.targets ?? []).filter(
-  (target) => !selectedProject || target.project === selectedProject,
+const projectsConfig = getProjectsConfig(rootDir);
+const projectById = new Map(
+  (projectsConfig.projects ?? []).map((project) => [project.id, project]),
 );
+const targets = (config.targets ?? []).filter((target) => {
+  if (selectedProjects) return selectedProjects.has(target.project);
+  return !selectedProject || target.project === selectedProject;
+});
+
+if (selectedProjects && selectedProjects.size === 0) {
+  console.log("No token projects selected for target delivery.");
+  process.exit(0);
+}
 
 if (targets.length === 0) {
   throw new Error(
@@ -33,7 +47,14 @@ if (isApplyMode) {
 }
 
 for (const target of targets) {
-  validateTarget(target);
+  const project = validateTarget(target);
+  if (isPendingFirstSyncProject(project)) {
+    console.log(
+      `Skipping target delivery for ${target.project}: ${project.tokenFile} does not exist yet. It will be created by the first plugin PR/MR.`,
+    );
+    continue;
+  }
+  validateBuiltArtifacts(target);
   const delivery = buildDelivery(target);
   printDelivery(delivery, isApplyMode ? "apply" : "dry-run");
 
@@ -46,6 +67,22 @@ function getArgValue(name) {
   const prefix = `${name}=`;
   const value = process.argv.find((arg) => arg.startsWith(prefix));
   return value ? value.slice(prefix.length) : undefined;
+}
+
+function getSelectedProjectIds() {
+  const values = [];
+  for (const arg of process.argv.slice(2)) {
+    if (arg.startsWith("--projects=")) {
+      values.push(...arg.slice("--projects=".length).split(","));
+    }
+  }
+
+  if ("TARGET_DELIVERY_PROJECTS" in process.env) {
+    values.push(...process.env.TARGET_DELIVERY_PROJECTS.split(","));
+  }
+
+  const selected = values.map((value) => value.trim()).filter(Boolean);
+  return values.length > 0 ? new Set(selected) : null;
 }
 
 function validateTarget(target) {
@@ -64,6 +101,24 @@ function validateTarget(target) {
     }
   }
 
+  const project = projectById.get(target.project);
+  if (!project) {
+    throw new Error(`${target.project} does not exist in projects.config.json.`);
+  }
+  if (target.source !== project.outputDir) {
+    throw new Error(
+      `${target.project} source must match projects.config.json outputDir (${project.outputDir}).`,
+    );
+  }
+
+  return project;
+}
+
+function isPendingFirstSyncProject(project) {
+  return !fs.existsSync(path.join(rootDir, project.tokenFile));
+}
+
+function validateBuiltArtifacts(target) {
   const sourceDir = path.join(rootDir, target.source);
   const manifestPath = path.join(sourceDir, "manifest.json");
   if (!fs.existsSync(manifestPath)) {
