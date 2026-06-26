@@ -1,27 +1,10 @@
 {
   "targets": [
     {
-      "project": "project-a",
-      "repo": "org/project-a",
+      "project": "ekn-design-tokens-target",
+      "repo": "https://github.com/kimbaole-ekino/ekn-design-tokens-target",
       "branch": "main",
-      "source": "dist/project-a",
-      "destination": {
-        "css": "src/styles/tokens",
-        "html": "src/static/blocks",
-        "json": "src/styles/tokens/metadata",
-        "manifest": "src/styles/tokens/manifest.json"
-      },
-      "delivery": {
-        "provider": "github",
-        "branchPrefix": "tokens/",
-        "labels": []
-      }
-    },
-    {
-      "project": "project-b",
-      "repo": "org/project-b",
-      "branch": "main",
-      "source": "dist/project-b",
+      "source": "dist/ekn-design-tokens-target",
       "destination": {
         "css": "src/styles/tokens",
         "html": "src/static/blocks",

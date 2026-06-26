@@ -1,15 +1,9 @@
 {
   "projects": [
     {
-      "id": "project-a",
-      "tokenFile": "token-definitions/projects/project-a/tokens.json",
-      "outputDir": "dist/project-a",
-      "blockPools": ["core"]
-    },
-    {
-      "id": "project-b",
-      "tokenFile": "token-definitions/projects/project-b/tokens.json",
-      "outputDir": "dist/project-b",
+      "id": "ekn-design-tokens-target",
+      "tokenFile": "token-definitions/projects/ekn-design-tokens-target/tokens.json",
+      "outputDir": "dist/ekn-design-tokens-target",
       "blockPools": ["core"]
     }
   ]
