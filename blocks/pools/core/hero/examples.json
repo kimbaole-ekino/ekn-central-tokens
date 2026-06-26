@@ -1,0 +1,24 @@
+{
+  "examples": [
+    {
+      "type": "hero",
+      "props": {
+        "title": "Design tokens at scale",
+        "description": "Reviewed token delivery from Figma to production projects.",
+        "variant": "centered"
+      },
+      "slots": {
+        "actions": [
+          {
+            "type": "button",
+            "props": {
+              "label": "Read docs",
+              "href": "/docs",
+              "variant": "primary"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

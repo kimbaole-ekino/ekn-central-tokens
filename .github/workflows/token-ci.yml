@@ -1,0 +1,37 @@
+name: Token CI
+
+on:
+  pull_request:
+    paths:
+      - "token-definitions/**"
+      - "blocks/**"
+      - "projects.config.json"
+      - "targets.config.json"
+      - "scripts/**"
+      - ".github/workflows/token-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  validate-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Detect affected token projects
+        if: github.event_name == 'pull_request'
+        run: node scripts/detect-affected-token-projects.mjs --base=${{ github.event.pull_request.base.sha }} --head=${{ github.sha }}
+      - run: npm run validate:tokens
+      - run: npm run check:stale-token-pr
+      - run: npm run build:artifacts
+      - name: Upload token artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: token-dist
+          path: dist/
+          if-no-files-found: ignore
