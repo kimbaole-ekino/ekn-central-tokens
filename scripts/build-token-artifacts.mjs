@@ -11,9 +11,21 @@ import {
 
 const rootDir = process.cwd();
 const config = getProjectsConfig(rootDir);
+const selectedProjectIds = getSelectedProjectIds();
+const projects = getSelectedProjects(config.projects ?? [], selectedProjectIds);
 
-for (const project of config.projects ?? []) {
+if (selectedProjectIds && projects.length === 0) {
+  console.log("No token projects selected for artifact build.");
+}
+
+for (const project of projects) {
   const tokenPath = path.join(rootDir, project.tokenFile);
+  if (!fs.existsSync(tokenPath)) {
+    console.log(
+      `Skipping build for ${project.id}: ${project.tokenFile} does not exist yet. It will be created by the first plugin PR/MR.`,
+    );
+    continue;
+  }
   const tokens = readJson(tokenPath);
   validateTokenDocument(tokens, project.tokenFile);
   const themes = getThemesFromTokenDocument(project, tokens);
@@ -75,6 +87,38 @@ for (const project of config.projects ?? []) {
     `${JSON.stringify(manifest, null, 2)}\n`,
   );
   console.log(`Built ${project.id} into ${project.outputDir}`);
+}
+
+function getSelectedProjectIds() {
+  const values = [];
+  for (const arg of process.argv.slice(2)) {
+    if (arg.startsWith("--project=")) {
+      values.push(arg.slice("--project=".length));
+    }
+    if (arg.startsWith("--projects=")) {
+      values.push(...arg.slice("--projects=".length).split(","));
+    }
+  }
+
+  if ("TOKEN_PROJECTS" in process.env) {
+    values.push(...process.env.TOKEN_PROJECTS.split(","));
+  }
+
+  const selected = values.map((value) => value.trim()).filter(Boolean);
+  return values.length > 0 ? new Set(selected) : null;
+}
+
+function getSelectedProjects(projects, selectedProjectIds) {
+  if (!selectedProjectIds) return projects;
+
+  const knownProjectIds = new Set(projects.map((project) => project.id));
+  for (const projectId of selectedProjectIds) {
+    if (!knownProjectIds.has(projectId)) {
+      throw new Error(`Unknown token project selected for build: ${projectId}`);
+    }
+  }
+
+  return projects.filter((project) => selectedProjectIds.has(project.id));
 }
 
 function renderChildBlock(rootDir, poolDir, child) {

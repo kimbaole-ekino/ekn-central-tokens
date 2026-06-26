@@ -12,6 +12,7 @@ creates target project PRs/MRs for maintainer review.
 | --- | --- |
 | `repository-structure.md` | Source folders, config files, and ownership boundaries. |
 | `ci-cd.md` | Pull request validation, stale checks, and build workflow. |
+| `affected-project-ci.md` | Affected-project detection and scalable PR build policy. |
 | `style-dictionary-build.md` | Official Style Dictionary build model and repository orchestration. |
 | `generated-artifacts.md` | Generated CSS, metadata JSON, static HTML, and manifest contract. |
 | `release-workflow.md` | Review, merge, release, and artifact handoff flow. |

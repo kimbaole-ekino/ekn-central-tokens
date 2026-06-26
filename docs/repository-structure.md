@@ -33,6 +33,7 @@ ekn-central-tokens/
     validate-token-projects.mjs
     build-token-artifacts.mjs
     check-stale-token-pr.mjs
+    detect-affected-token-projects.mjs
     create-target-merge-requests.mjs
 
   projects.config.json
@@ -52,6 +53,10 @@ ekn-central-tokens/
 | `targets.config.json` | Central token repo | Target project delivery destinations. |
 | `.github/workflows/` | Central token repo | CI and manual target delivery workflows. |
 | `dist/` | Generated | Build output. Ignored by Git. |
+
+`projects.config.json` and `targets.config.json` may be committed before a new
+project's `tokens.json` exists. The first Figma plugin sync creates that token
+file through a reviewed PR/MR.
 
 ## Token Source Contract
 
