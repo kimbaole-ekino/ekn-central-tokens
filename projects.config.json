@@ -5,6 +5,12 @@
       "tokenFile": "token-definitions/projects/ekn-design-tokens-target/tokens.json",
       "outputDir": "dist/ekn-design-tokens-target",
       "blockPools": ["core"]
+    },
+    {
+      "id": "ekn-design-tokens-target2",
+      "tokenFile": "token-definitions/projects/ekn-design-tokens-target2/tokens.json",
+      "outputDir": "dist/ekn-design-tokens-target2",
+      "blockPools": ["core"]
     }
   ]
 }
