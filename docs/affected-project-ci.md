@@ -1,6 +1,8 @@
 # Affected Project CI
 
-This note records the scalable CI decision for central token pull requests.
+This note records the scalable CI decision for central token pull requests. It
+is the source of truth for affected-project detection rules. `ci-cd.md` only
+summarizes how CI uses this behavior.
 
 ## Decision
 
@@ -37,7 +39,7 @@ Affected-project detection uses changed file paths and config diffs:
 
 | Change | Build scope |
 | --- | --- |
-| `token-definitions/projects/{project}/tokens.json` | That project only. |
+| `token-definitions/projects/{project-id}/tokens.json` | That project only. |
 | New project added to `projects.config.json` | That project only. |
 | Existing project config changed | That project only. |
 | Target config changed in `targets.config.json` | That target project only. |

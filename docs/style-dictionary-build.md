@@ -3,14 +3,17 @@
 Style Dictionary is the primary build engine for token processing in this
 central repository.
 
-The repository uses the official `style-dictionary` npm package from
-`scripts/build-token-artifacts.mjs`. The script owns repository orchestration;
-Style Dictionary owns token transformation and formatting.
+The repository uses the official `style-dictionary` npm package with
+`@tokens-studio/sd-transforms` from `scripts/build-token-artifacts.mjs`. The
+script owns repository orchestration; Style Dictionary owns token transformation
+and formatting. The generated artifact contract is documented in
+`generated-artifacts.md`; this file focuses on how the build produces that
+contract.
 
 ## Target Build Model
 
 ```text
-token-definitions/projects/{project}/tokens.json
+token-definitions/projects/{project-id}/tokens.json
         +
 projects.config.json
         |
@@ -18,9 +21,11 @@ projects.config.json
 Style Dictionary config per project/theme
         |
         v
-dist/{project}/css/*.css
-dist/{project}/json/*.metadata.json
-dist/{project}/manifest.json
+dist/{project-id}/css/{project-id}.{theme-id}.tokens.css
+dist/{project-id}/css/{project-id}.tokens.css
+dist/{project-id}/json/{project-id}.{theme-id}.resolved-tokens.json
+dist/{project-id}/json/{project-id}.{theme-id}.metadata.json
+dist/{project-id}/manifest.json
 ```
 
 ## Style Dictionary Responsibilities
@@ -76,6 +81,7 @@ Current implementation:
 scripts/build-token-artifacts.mjs
 scripts/token-build-utils.mjs
 style-dictionary
+@tokens-studio/sd-transforms
 ```
 
 The build currently:
@@ -87,11 +93,36 @@ The build currently:
 - requires `tokens.json.$themes`,
 - derives theme builds from each theme's `selectedTokenSets`,
 - flattens selected token sets by theme,
+- applies the Tokens Studio preprocessor and `tokens-studio` transform group,
 - uses Style Dictionary to resolve aliases,
 - uses Style Dictionary to write CSS custom properties,
+- writes one CSS file per theme and one aggregate CSS file that imports all
+  theme files,
+- uses a Style Dictionary custom format to write resolved token JSON,
 - uses a Style Dictionary custom format to write metadata JSON,
 - renders static HTML examples,
 - writes `manifest.json`.
+
+## Tokens Studio Transforms
+
+`@tokens-studio/sd-transforms` is used at the Style Dictionary boundary to keep
+the central build compatible with Tokens Studio token exports while preserving
+the existing repository orchestration.
+
+The build registers the package once, then uses:
+
+```js
+preprocessors: ["tokens-studio"]
+transformGroup: "tokens-studio"
+transforms: ["name/kebab"]
+```
+
+This is intentionally a low-risk integration:
+
+- the dependency version is compatible with Style Dictionary 4,
+- token document validation remains in `scripts/token-build-utils.mjs`,
+- project/theme selection still comes from `$themes[].selectedTokenSets`,
+- custom formats still own resolved token JSON and metadata JSON shape.
 
 ## Style Dictionary Structure
 
@@ -120,25 +151,36 @@ Recommended scripts:
 
 ## Output Naming
 
-CSS:
+Generated artifact naming is defined in `generated-artifacts.md`. The Style
+Dictionary build must produce that contract without redefining a different file
+layout here.
+
+The main outputs are:
 
 ```text
-dist/{project}/css/{project}.{theme-segment}.css
-```
-
-Metadata JSON:
-
-```text
-dist/{project}/json/{theme}.metadata.json
-```
-
-Manifest:
-
-```text
-dist/{project}/manifest.json
+dist/{project-id}/css/{project-id}.{theme-id}.tokens.css
+dist/{project-id}/css/{project-id}.tokens.css
+dist/{project-id}/json/{project-id}.{theme-id}.resolved-tokens.json
+dist/{project-id}/json/{project-id}.{theme-id}.metadata.json
+dist/{project-id}/manifest.json
 ```
 
 ## Required Transform Behavior
+
+Theme CSS selectors use friendly theme names:
+
+```css
+[data-theme="light"] {
+  --primitive-color-brand-primary: #e60000;
+}
+```
+
+The generated aggregate CSS file imports each theme file:
+
+```css
+@import './project-a.light.tokens.css';
+@import './project-a.dark.tokens.css';
+```
 
 Aliases should become CSS references when possible:
 
@@ -153,6 +195,6 @@ Resolved metadata should preserve both:
   "value": "#e60000",
   "originalValue": "{primitive.color.brand.primary}",
   "cssVariable": "--component-button-background-primary",
-  "theme": "project-a-light"
+  "theme": "light"
 }
 ```

@@ -26,7 +26,7 @@ dist/
 Each project writes:
 
 ```text
-dist/{project}/
+dist/{project-id}/
   css/
   json/
   html/
@@ -37,25 +37,147 @@ Example:
 
 ```text
 dist/project-a/
-  css/project-a.light.css
-  json/project-a-light.metadata.json
+  css/project-a.tokens.css
+  css/project-a.light.tokens.css
+  css/project-a.dark.tokens.css
+  json/project-a.light.resolved-tokens.json
+  json/project-a.light.metadata.json
   html/button.html
   html/hero.html
   manifest.json
 ```
+
+## Naming Convention
+
+Generated artifact naming follows:
+
+```text
+{project-id}.{theme-id}.{artifact-type}.{ext}
+```
+
+Rules:
+
+- `project-id` and `theme-id` are kebab-case.
+- `.` separates project, theme, artifact type, and extension.
+- `-` is used only inside ids.
+- Do not combine project and theme with a hyphen when naming generated files.
+- Do not put timestamps or versions in filenames.
+- Put version, build time, and source commit in `manifest.json`.
+
+Examples:
+
+- `project-a.tokens.css`
+- `project-a.light.tokens.css`
+- `project-a.dark.tokens.css`
+- `project-a.light.resolved-tokens.json`
+- `project-a.light.metadata.json`
+
+Source token files remain simple:
+
+```text
+token-definitions/projects/{project-id}/tokens.json
+```
+
+## Source And Generated Files
+
+The source token file is the reviewed input:
+
+```text
+token-definitions/projects/{project-id}/tokens.json
+```
+
+Generated files are rebuildable outputs:
+
+```text
+dist/{project-id}/css/{project-id}.{theme-id}.tokens.css
+dist/{project-id}/css/{project-id}.tokens.css
+dist/{project-id}/json/{project-id}.{theme-id}.resolved-tokens.json
+dist/{project-id}/json/{project-id}.{theme-id}.metadata.json
+dist/{project-id}/manifest.json
+```
+
+`manifest.json` is the canonical lookup for generated files in the central
+build output. It is required in central build output, but optional in target
+project delivery. It is delivered to target projects only when their tooling
+needs that lookup contract.
 
 ## CSS
 
 CSS output contains theme-scoped CSS custom properties:
 
 ```css
-[data-theme="project-a-light"] {
+[data-theme="light"] {
   --primitive-color-brand-primary: #e60000;
   --primitive-spacing-md: 16px;
 }
 ```
 
 Style Dictionary is the primary engine for CSS generation.
+
+Per-theme outputs:
+
+```text
+dist/{project-id}/css/{project-id}.{theme-id}.tokens.css
+```
+
+Example:
+
+```text
+dist/project-a/css/project-a.light.tokens.css
+```
+
+Aggregate output:
+
+```text
+dist/{project-id}/css/{project-id}.tokens.css
+```
+
+Example:
+
+```css
+@import './project-a.light.tokens.css';
+@import './project-a.dark.tokens.css';
+```
+
+### Why Split CSS By Theme
+
+Separate theme CSS files are the default because they make theme boundaries
+explicit and keep target project usage simple:
+
+- target projects can import only the themes they support,
+- per-theme diffs are easier to review,
+- cache invalidation is narrower when only one theme changes,
+- `data-theme` values stay short and readable, such as `light` and `dark`.
+
+Tradeoffs:
+
+- a target that wants all themes needs either multiple imports or the aggregate
+  import file,
+- very small projects may see more files than a single bundled CSS output,
+- target build tools must allow CSS `@import` if they consume the aggregate
+  file directly.
+
+The central build therefore writes both per-theme CSS and
+`{project-id}.tokens.css`. Target projects should import the aggregate file when
+they want every generated theme, or import individual theme files when they want
+explicit control.
+
+## Resolved Token JSON
+
+Resolved token JSON contains the theme-specific resolved token document used by
+target projects that consume tokens as data instead of CSS.
+
+Output:
+
+```text
+dist/{project-id}/json/{project-id}.{theme-id}.resolved-tokens.json
+```
+
+Example:
+
+```text
+dist/project-a/json/project-a.light.resolved-tokens.json
+```
 
 ## Metadata JSON
 
@@ -67,9 +189,21 @@ Metadata output records generated variable data:
     "value": "#e60000",
     "originalValue": "#e60000",
     "cssVariable": "--primitive-color-brand-primary",
-    "theme": "project-a-light"
+    "theme": "light"
   }
 }
+```
+
+Output:
+
+```text
+dist/{project-id}/json/{project-id}.{theme-id}.metadata.json
+```
+
+Example:
+
+```text
+dist/project-a/json/project-a.light.metadata.json
 ```
 
 ## Static HTML
@@ -84,7 +218,7 @@ blocks/pools/{pool}/{block}/template.html
 Output:
 
 ```text
-dist/{project}/html/{block}.html
+dist/{project-id}/html/{block-id}.html
 ```
 
 This is a delivery artifact for target projects that need static HTML snippets.
@@ -95,21 +229,32 @@ It is not generated from Figma layers.
 Each project writes:
 
 ```text
-dist/{project}/manifest.json
+dist/{project-id}/manifest.json
 ```
 
-The manifest is the handoff contract for target delivery.
+The manifest is the central build lookup for generated artifact paths. It is
+also available as an optional handoff contract for target delivery when a target
+project has tooling that needs it.
 
-Current shape:
+Recommended shape:
 
 ```json
 {
   "project": "project-a",
-  "version": "20260625T120000Z",
+  "version": "20260626T090000Z",
+  "buildTime": "2026-06-26T09:00:00Z",
+  "sourceCommit": "abc1234",
+  "css": "css/project-a.tokens.css",
   "themes": {
-    "project-a-light": {
-      "css": "css/project-a.light.css",
-      "metadata": "json/project-a-light.metadata.json"
+    "light": {
+      "css": "css/project-a.light.tokens.css",
+      "resolvedTokens": "json/project-a.light.resolved-tokens.json",
+      "metadata": "json/project-a.light.metadata.json"
+    },
+    "dark": {
+      "css": "css/project-a.dark.tokens.css",
+      "resolvedTokens": "json/project-a.dark.resolved-tokens.json",
+      "metadata": "json/project-a.dark.metadata.json"
     }
   },
   "html": {
@@ -118,10 +263,26 @@ Current shape:
 }
 ```
 
+## Target Delivery Policy
+
+Target project PRs/MRs should receive the files they need to run the product.
+For normal CSS-token consumption, that means:
+
+```text
+css/{project-id}.tokens.css
+css/{project-id}.{theme-id}.tokens.css
+html/*.html
+```
+
+Resolved token JSON, metadata JSON, and `manifest.json` should stay in central
+build output by default. They are useful for tooling, audits, debugging,
+artifact lookup, and target projects that consume token data at runtime, but
+they are not required for a target that only imports CSS variables.
+
+A target should opt into JSON or manifest delivery only when it has a concrete
+consumer for those files.
+
 Future improvements:
 
-- derive version from Git commit SHA or release tag,
-- include source commit,
-- include build timestamp separately from version,
 - include artifact checksums,
 - include target delivery compatibility metadata.

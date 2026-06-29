@@ -6,10 +6,8 @@
       "branch": "main",
       "source": "dist/ekn-design-tokens-target",
       "destination": {
-        "css": "src/styles/tokens",
-        "html": "src/static/blocks",
-        "json": "src/styles/tokens/metadata",
-        "manifest": "src/styles/tokens/manifest.json"
+        "css": "src/styles/tokens/css",
+        "html": "src/styles/tokens/html"
       },
       "delivery": {
         "provider": "github",

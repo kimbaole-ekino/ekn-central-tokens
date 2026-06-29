@@ -46,7 +46,7 @@ docs/
 
 ## Core Concepts
 
-- `token-definitions/projects/{project}/tokens.json` is plugin-submitted token
+- `token-definitions/projects/{project-id}/tokens.json` is plugin-submitted token
   source. It includes token sets, values, `$themes`, and `$metadata`.
 - `projects.config.json` defines which projects are built.
 - `blocks/` contains static HTML block contracts and examples.
@@ -147,10 +147,31 @@ Target delivery MR for project-b
 Build output is written under `dist/`:
 
 ```text
-dist/project-a/css/*.css
-dist/project-a/json/*.metadata.json
+dist/project-a/css/project-a.tokens.css
+dist/project-a/css/project-a.light.tokens.css
+dist/project-a/css/project-a.dark.tokens.css
+dist/project-a/json/project-a.light.resolved-tokens.json
+dist/project-a/json/project-a.light.metadata.json
 dist/project-a/html/*.html
 dist/project-a/manifest.json
+```
+
+Generated artifact filenames use:
+
+```text
+{project-id}.{theme-id}.{artifact-type}.{ext}
+```
+
+The aggregate CSS file uses:
+
+```text
+{project-id}.tokens.css
+```
+
+Source token files stay at:
+
+```text
+token-definitions/projects/{project-id}/tokens.json
 ```
 
 `dist/` is intentionally ignored by Git.

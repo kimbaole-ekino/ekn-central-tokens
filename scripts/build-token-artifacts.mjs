@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import StyleDictionary from "style-dictionary";
+import { register as registerTokensStudioTransforms } from "@tokens-studio/sd-transforms";
 import {
   getProjectsConfig,
   readJson,
@@ -13,6 +15,8 @@ const rootDir = process.cwd();
 const config = getProjectsConfig(rootDir);
 const selectedProjectIds = getSelectedProjectIds();
 const projects = getSelectedProjects(config.projects ?? [], selectedProjectIds);
+
+registerTokensStudioTransforms(StyleDictionary);
 
 if (selectedProjectIds && projects.length === 0) {
   console.log("No token projects selected for artifact build.");
@@ -30,28 +34,40 @@ for (const project of projects) {
   validateTokenDocument(tokens, project.tokenFile);
   const themes = getThemesFromTokenDocument(project, tokens);
   const outputDir = path.join(rootDir, project.outputDir);
+  const buildTime = new Date().toISOString();
   const manifest = {
     project: project.id,
-    version: new Date()
-      .toISOString()
-      .replace(/[-:]/g, "")
-      .replace(/\..+$/, "Z"),
+    version: buildTime.replace(/[-:]/g, "").replace(/\..+$/, "Z"),
+    buildTime,
+    sourceCommit: getSourceCommit(rootDir),
+    css: `css/${project.id}.tokens.css`,
     themes: {},
     html: {},
   };
+  const themeCssFiles = [];
 
   for (const theme of themes) {
-    const cssFile = `css/${theme.output}`;
-    const metadataFile = `json/${theme.id}.metadata.json`;
+    const artifactBase = `${project.id}.${theme.outputId}`;
+    const cssFile = `css/${artifactBase}.tokens.css`;
+    const resolvedTokensFile = `json/${artifactBase}.resolved-tokens.json`;
+    const metadataFile = `json/${artifactBase}.metadata.json`;
     await buildThemeWithStyleDictionary({
       tokens: selectThemeTokens(tokens, theme.sets),
       outputDir,
       cssFile,
+      resolvedTokensFile,
       metadataFile,
-      themeId: theme.id,
+      themeId: theme.outputId,
     });
-    manifest.themes[theme.id] = { css: cssFile, metadata: metadataFile };
+    manifest.themes[theme.outputId] = {
+      css: cssFile,
+      resolvedTokens: resolvedTokensFile,
+      metadata: metadataFile,
+    };
+    themeCssFiles.push(cssFile);
   }
+
+  writeCssIndex(outputDir, manifest.css, themeCssFiles);
 
   for (const poolName of project.blockPools ?? []) {
     const poolDir = path.join(rootDir, "blocks", "pools", poolName);
@@ -146,6 +162,8 @@ function getThemesFromTokenDocument(project, tokens) {
     );
   }
 
+  const outputIds = new Set();
+
   return tokens.$themes.map((theme) => {
     if (!theme || typeof theme !== "object") {
       throw new Error(`${project.tokenFile} has an invalid theme entry.`);
@@ -164,45 +182,93 @@ function getThemesFromTokenDocument(project, tokens) {
       );
     }
 
+    const outputName =
+      typeof theme.name === "string" && theme.name.trim()
+        ? theme.name
+        : theme.id;
+    const outputId =
+      themeOutputSegment(project.id, outputName) ||
+      themeOutputSegment(project.id, theme.id);
+    if (!outputId) {
+      throw new Error(
+        `${project.tokenFile} theme ${theme.id} does not produce a valid kebab-case theme output name.`,
+      );
+    }
+    if (outputIds.has(outputId)) {
+      throw new Error(
+        `${project.tokenFile} has multiple themes that produce generated theme id ${outputId}.`,
+      );
+    }
+    outputIds.add(outputId);
+
     return {
       id: theme.id,
       name: theme.name ?? theme.id,
       sets,
-      output: `${project.id}.${themeOutputSegment(project.id, theme.id)}.css`,
+      outputId,
     };
   });
 }
 
 function themeOutputSegment(projectId, themeId) {
-  const segment = themeId.startsWith(`${projectId}-`)
-    ? themeId.slice(projectId.length + 1)
-    : themeId;
+  const projectSegment = kebabSegment(projectId);
+  const themeSegment = kebabSegment(themeId);
 
-  return segment
+  return themeSegment.startsWith(`${projectSegment}-`)
+    ? themeSegment.slice(projectSegment.length + 1)
+    : themeSegment;
+}
+
+function kebabSegment(value) {
+  return String(value)
     .replace(/[^a-zA-Z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .toLowerCase();
+}
+
+function writeCssIndex(outputDir, cssIndexFile, themeCssFiles) {
+  const imports = themeCssFiles
+    .map((cssFile) => `@import './${path.posix.basename(cssFile)}';`)
+    .join("\n");
+  writeFile(path.join(outputDir, cssIndexFile), `${imports}\n`);
 }
 
 async function buildThemeWithStyleDictionary({
   tokens,
   outputDir,
   cssFile,
+  resolvedTokensFile,
   metadataFile,
   themeId,
 }) {
   const dictionary = new StyleDictionary({
     tokens,
+    preprocessors: ["tokens-studio"],
     hooks: {
       formats: {
+        "ekn/resolved-tokens-json": ({ dictionary }) => {
+          const resolvedTokens = Object.fromEntries(
+            dictionary.allTokens
+              .map((token) => [
+                token.path.join("."),
+                compactObject({
+                  type: tokenType(token),
+                  value: tokenValue(token),
+                  description: tokenDescription(token),
+                }),
+              ])
+              .sort(([left], [right]) => left.localeCompare(right)),
+          );
+          return `${JSON.stringify(resolvedTokens, null, 2)}\n`;
+        },
         "ekn/metadata-json": ({ dictionary }) => {
           const metadata = Object.fromEntries(
             dictionary.allTokens
               .map((token) => [
                 token.path.join("."),
                 {
-                  value: token.value,
-                  originalValue: token.original?.value ?? token.value,
+                  value: tokenValue(token),
+                  originalValue: tokenOriginalValue(token),
                   cssVariable: `--${token.name}`,
                   theme: themeId,
                 },
@@ -215,7 +281,8 @@ async function buildThemeWithStyleDictionary({
     },
     platforms: {
       css: {
-        transformGroup: "css",
+        transformGroup: "tokens-studio",
+        transforms: ["name/kebab"],
         buildPath: `${path.join(outputDir, path.dirname(cssFile))}/`,
         files: [
           {
@@ -230,9 +297,17 @@ async function buildThemeWithStyleDictionary({
         ],
       },
       metadata: {
-        transformGroup: "css",
+        transformGroup: "tokens-studio",
+        transforms: ["name/kebab"],
         buildPath: `${path.join(outputDir, path.dirname(metadataFile))}/`,
         files: [
+          {
+            destination: path.basename(resolvedTokensFile),
+            format: "ekn/resolved-tokens-json",
+            options: {
+              showFileHeader: false,
+            },
+          },
           {
             destination: path.basename(metadataFile),
             format: "ekn/metadata-json",
@@ -246,4 +321,39 @@ async function buildThemeWithStyleDictionary({
   });
 
   await dictionary.buildAllPlatforms();
+}
+
+function getSourceCommit(cwd) {
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA;
+  try {
+    return execFileSync("git", ["rev-parse", "--short=12", "HEAD"], {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return "unknown";
+  }
+}
+
+function compactObject(object) {
+  return Object.fromEntries(
+    Object.entries(object).filter(([, value]) => value !== undefined),
+  );
+}
+
+function tokenValue(token) {
+  return token.value ?? token.$value;
+}
+
+function tokenOriginalValue(token) {
+  return token.original?.value ?? token.original?.$value ?? tokenValue(token);
+}
+
+function tokenType(token) {
+  return token.type ?? token.$type;
+}
+
+function tokenDescription(token) {
+  return token.description ?? token.$description;
 }

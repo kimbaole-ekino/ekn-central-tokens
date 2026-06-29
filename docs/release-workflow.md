@@ -1,7 +1,9 @@
 # Release Workflow
 
 This repository turns reviewed token source changes into validated build
-artifacts.
+artifacts. In this document, release means a reviewed token source change has
+been merged and rebuilt from `main`; target delivery means creating PRs/MRs into
+product repositories.
 
 ## Current Release Flow
 
@@ -42,7 +44,8 @@ Before merge, reviewers should check:
 - stable token IDs are not duplicated,
 - generated CSS paths are correct,
 - generated HTML blocks still render valid markup,
-- manifest paths match target delivery expectations,
+- manifest paths match generated artifact expectations and any optional target
+  delivery configuration,
 - stale check is passing or intentionally skipped because SHA inputs are absent.
 
 ## Release Options

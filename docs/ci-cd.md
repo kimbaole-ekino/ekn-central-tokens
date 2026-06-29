@@ -3,7 +3,9 @@
 CI is the final validation and build authority for token changes.
 
 The Figma plugin may validate early, but this repository decides whether a token
-change can be merged and delivered.
+change can be merged and delivered. This file describes workflow behavior;
+affected-project detection rules are documented in `affected-project-ci.md`, and
+target PR/MR delivery details are documented in `target-project-delivery.md`.
 
 ## Workflows
 
@@ -95,10 +97,7 @@ Mode: dry-run
 ```
 
 Pull request CI narrows the artifact build with affected-project detection.
-For example, a change under
-`token-definitions/projects/project-c/tokens.json` builds `project-c` only.
-Shared build changes such as `scripts/**`, `package.json`, or
-`.github/workflows/token-ci.yml` intentionally rebuild all projects.
+See `affected-project-ci.md` for the full detection rules and fallback behavior.
 
 ## Stale PR Check
 
@@ -154,23 +153,18 @@ A developer may register a new project in `projects.config.json` and
 `targets.config.json` before the Figma plugin has created that project's
 `tokens.json`.
 
-In that pre-first-sync state:
-
-- `npm run validate:tokens` validates the project and target configuration,
-- missing `tokenFile` paths are reported as pending first sync,
-- missing `tokenFile` paths do not fail token validation,
-- `npm run build:artifacts` skips the pending project because there is no
-  token source to build yet,
-- `npm run delivery:target-mr` skips target delivery for the pending project
-  because no built artifact can exist yet.
+In that pre-first-sync state, config validation still runs, but artifact build
+and target delivery skip the project until the first plugin PR/MR creates the
+token source file. See `repository-structure.md` for the first sync boundary and
+`affected-project-ci.md` for the affected-project behavior.
 
 Expected pre-first-sync output:
 
 ```text
-Skipping {project}: token-definitions/projects/{project}/tokens.json does not exist yet. It will be created by the first plugin PR/MR.
+Skipping {project-id}: token-definitions/projects/{project-id}/tokens.json does not exist yet. It will be created by the first plugin PR/MR.
 Validated 2 token file(s); 1 pending first sync project(s).
-Skipping build for {project}: token-definitions/projects/{project}/tokens.json does not exist yet. It will be created by the first plugin PR/MR.
-Skipping target delivery for {project}: token-definitions/projects/{project}/tokens.json does not exist yet. It will be created by the first plugin PR/MR.
+Skipping build for {project-id}: token-definitions/projects/{project-id}/tokens.json does not exist yet. It will be created by the first plugin PR/MR.
+Skipping target delivery for {project-id}: token-definitions/projects/{project-id}/tokens.json does not exist yet. It will be created by the first plugin PR/MR.
 ```
 
 ## Future CI Improvements

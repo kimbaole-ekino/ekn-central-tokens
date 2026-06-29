@@ -58,6 +58,11 @@ ekn-central-tokens/
 project's `tokens.json` exists. The first Figma plugin sync creates that token
 file through a reviewed PR/MR.
 
+This is the first sync boundary. A configured project without `tokens.json` is
+valid during onboarding: validation checks the config, artifact build skips the
+pending project, and target delivery skips it until the first token source file
+exists.
+
 ## Token Source Contract
 
 Each normal project has one plugin-submitted token document:
@@ -102,7 +107,7 @@ the plugin runtime.
 Expected provider output:
 
 ```text
-Changed token file: token-definitions/projects/{project}/tokens.json
+Changed token file: token-definitions/projects/{project-id}/tokens.json
 Branch: tokens/figma-...
 PR into the central repo default branch
 ```

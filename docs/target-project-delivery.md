@@ -1,7 +1,9 @@
 # Target Project Delivery
 
 Target delivery describes how generated artifacts from this central repository
-reach product repositories.
+reach product repositories. The generated artifact contract is defined in
+`generated-artifacts.md`; this file only describes how those artifacts are copied
+and proposed to target repositories.
 
 ## Delivery Decision
 
@@ -104,10 +106,8 @@ Prefer a GitHub App token or narrowly scoped bot token over a personal token.
       "branch": "main",
       "source": "dist/project-a",
       "destination": {
-        "css": "src/styles/tokens",
-        "html": "src/static/blocks",
-        "json": "src/styles/tokens/metadata",
-        "manifest": "src/styles/tokens/manifest.json"
+        "css": "src/styles/tokens/css",
+        "html": "src/styles/tokens/html"
       },
       "delivery": {
         "provider": "github",
@@ -125,14 +125,14 @@ Each target entry requires:
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `project` | Yes | Project id. Must match `projects.config.json[].id` and the built `dist/{project}` folder. |
+| `project` | Yes | Project id. Must match `projects.config.json[].id` and the built `dist/{project-id}` folder. |
 | `repo` | Yes | Target GitHub repository. Use `owner/repo` or a GitHub URL accepted by `gh repo clone`. |
 | `branch` | Yes | Target base branch for the delivery PR/MR. Usually `main`. |
-| `source` | Yes | Built artifact folder in this repo, usually `dist/{project}`. |
-| `destination.css` | Yes | Directory in the target repo where generated CSS files are copied. |
+| `source` | Yes | Built artifact folder in this repo, usually `dist/{project-id}`. |
+| `destination.css` | Yes | Directory in the target repo where generated CSS token files are copied. |
 | `destination.html` | Yes | Directory in the target repo where generated static HTML block files are copied. |
-| `destination.json` | No | Directory in the target repo where metadata JSON files are copied. |
-| `destination.manifest` | No | File path in the target repo for `manifest.json`. |
+| `destination.json` | No | Directory in the target repo where generated resolved token JSON and metadata JSON files are copied when the target has a runtime or tooling consumer. |
+| `destination.manifest` | No | File path in the target repo for `manifest.json` when the target needs an artifact lookup contract. |
 | `delivery.provider` | No | Currently expected to be `github` when present. |
 | `delivery.branchPrefix` | No | Prefix for delivery branches. Defaults to `tokens/`. |
 | `delivery.branchName` | No | Fixed delivery branch name. Usually omit so the script derives one from project and manifest version. |
@@ -163,10 +163,8 @@ Each target entry requires:
   "branch": "main",
   "source": "dist/project-c",
   "destination": {
-    "css": "src/styles/tokens",
-    "html": "src/static/blocks",
-    "json": "src/styles/tokens/metadata",
-    "manifest": "src/styles/tokens/manifest.json"
+    "css": "src/styles/tokens/css",
+    "html": "src/styles/tokens/html"
   },
   "delivery": {
     "provider": "github",
@@ -182,6 +180,49 @@ The mapping is:
 token-definitions/projects/project-c/tokens.json
 -> build output dist/project-c
 -> target repo destination paths from targets.config.json
+```
+
+Generated artifact names are preserved during delivery. For example:
+
+```text
+dist/project-a/css/project-a.tokens.css
+-> src/styles/tokens/css/project-a.tokens.css
+
+dist/project-a/css/project-a.light.tokens.css
+-> src/styles/tokens/css/project-a.light.tokens.css
+```
+
+Target project examples should consume generated CSS through delivered paths:
+
+```css
+@import './tokens/css/project-a.tokens.css';
+```
+
+or:
+
+```css
+@import './tokens/css/project-a.light.tokens.css';
+@import './tokens/css/project-a.dark.tokens.css';
+```
+
+Then switch themes with friendly theme names:
+
+```html
+<html data-theme="light">
+```
+
+Optional JSON and manifest delivery should be configured only when the target
+has a concrete consumer:
+
+```text
+dist/project-a/json/project-a.light.resolved-tokens.json
+-> src/styles/tokens/json/project-a.light.resolved-tokens.json
+
+dist/project-a/json/project-a.light.metadata.json
+-> src/styles/tokens/json/project-a.light.metadata.json
+
+dist/project-a/manifest.json
+-> src/styles/tokens/manifest.json
 ```
 
 ### Per-Target Settings
@@ -204,8 +245,8 @@ should still have its own `repo`, `branch`, and destination paths.
 
 Target delivery requires:
 
-- built artifacts under `dist/{project}`,
-- `manifest.json`,
+- built artifacts under `dist/{project-id}`,
+- `manifest.json` in central build output,
 - target repo name,
 - target base branch,
 - destination paths,
@@ -215,15 +256,24 @@ Target delivery requires:
 
 The delivery script copies:
 
-- `dist/{project}/css/` to `destination.css`,
-- `dist/{project}/html/` to `destination.html`,
-- `dist/{project}/json/` to `destination.json` when configured,
-- `dist/{project}/manifest.json` to `destination.manifest` when configured.
+- `dist/{project-id}/css/` to `destination.css`,
+- `dist/{project-id}/html/` to `destination.html`,
+- `dist/{project-id}/json/` to `destination.json` only when configured,
+- `dist/{project-id}/manifest.json` to `destination.manifest` only when
+  configured.
+
+By default, target PRs/MRs should include CSS and static HTML only. Metadata
+JSON, resolved token JSON, and `manifest.json` are central build artifacts for
+tooling, debugging, audits, and artifact lookup. Deliver them to a target only
+when the target project has documented runtime or tooling usage for them.
+
+The target project review and approval happens through the target PR/MR unless
+a target repository documents a separate manual release process.
 
 It then creates a delivery branch named from:
 
 ```text
-{delivery.branchPrefix}{project}-{manifest.version}
+{delivery.branchPrefix}{project-id}-{manifest.version}
 ```
 
 Example:
