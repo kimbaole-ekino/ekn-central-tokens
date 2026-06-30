@@ -96,11 +96,11 @@ The build currently:
 - applies the Tokens Studio preprocessor and `tokens-studio` transform group,
 - uses Style Dictionary to resolve aliases,
 - uses Style Dictionary to write CSS custom properties,
-- writes one CSS file per theme and one aggregate CSS file that imports all
-  theme files,
+- writes one `:root` CSS file per theme/color scheme and one aggregate CSS file
+  with explicit `data-color-scheme` selector blocks,
 - uses a Style Dictionary custom format to write resolved token JSON,
 - uses a Style Dictionary custom format to write metadata JSON,
-- renders static HTML examples,
+- renders static HTML examples and a full generated demo page,
 - writes `manifest.json`.
 
 ## Tokens Studio Transforms
@@ -112,9 +112,9 @@ the existing repository orchestration.
 The build registers the package once, then uses:
 
 ```js
-preprocessors: ["tokens-studio"]
-transformGroup: "tokens-studio"
-transforms: ["name/kebab"]
+preprocessors: ["tokens-studio"];
+transformGroup: "tokens-studio";
+transforms: ["name/kebab"];
 ```
 
 This is intentionally a low-risk integration:
@@ -167,19 +167,42 @@ dist/{project-id}/manifest.json
 
 ## Required Transform Behavior
 
-Theme CSS selectors use friendly theme names:
+Aggregate CSS selectors use friendly generated theme names as color scheme ids:
 
 ```css
-[data-theme="light"] {
+:root[data-color-scheme="light"],
+[data-color-scheme="light"] {
   --primitive-color-brand-primary: #e60000;
 }
 ```
 
-The generated aggregate CSS file imports each theme file:
+The `:root[...]` selector is the primary full-site integration path for
+`<html data-color-scheme="light">`. The plain `[data-color-scheme]` selector is
+also emitted so flexible components, sections, previews, and isolated demos can
+scope color scheme overrides.
+
+The generated aggregate CSS file contains one selector block per theme/color
+scheme. It must not write scheme values directly to plain `:root` because there
+is no default color scheme:
 
 ```css
-@import './project-a.light.tokens.css';
-@import './project-a.dark.tokens.css';
+:root[data-color-scheme="light"],
+[data-color-scheme="light"] {
+  --primitive-color-brand-primary: #e60000;
+}
+
+:root[data-color-scheme="dark"],
+[data-color-scheme="dark"] {
+  --primitive-color-brand-primary: #b00000;
+}
+```
+
+Per-theme CSS files represent one selected scheme and can use plain `:root`:
+
+```css
+:root {
+  --primitive-color-brand-primary: #e60000;
+}
 ```
 
 Aliases should become CSS references when possible:
@@ -198,3 +221,14 @@ Resolved metadata should preserve both:
   "theme": "light"
 }
 ```
+
+The build removes color-scheme-specific set roots from CSS variable names. This
+includes roots that match the generated scheme id, such as `brand-a`, and roots
+that are selected by only one scheme, such as `theme-light` or `theme-dark`. The
+result keeps variables semantic and shared across schemes instead of emitting
+scheme-prefixed names such as `--brand-a-primary-color` or
+`--theme-light-primary-color`.
+
+After normalization, every color scheme must expose the same CSS variable names.
+If one scheme is missing a variable or emits an extra variable, the build fails
+before writing the aggregate CSS contract.

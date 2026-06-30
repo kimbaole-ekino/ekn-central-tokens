@@ -123,23 +123,23 @@ Prefer a GitHub App token or narrowly scoped bot token over a personal token.
 
 Each target entry requires:
 
-| Field | Required | Meaning |
-| --- | --- | --- |
-| `project` | Yes | Project id. Must match `projects.config.json[].id` and the built `dist/{project-id}` folder. |
-| `repo` | Yes | Target GitHub repository. Use `owner/repo` or a GitHub URL accepted by `gh repo clone`. |
-| `branch` | Yes | Target base branch for the delivery PR/MR. Usually `main`. |
-| `source` | Yes | Built artifact folder in this repo, usually `dist/{project-id}`. |
-| `destination.css` | Yes | Directory in the target repo where generated CSS token files are copied. |
-| `destination.html` | Yes | Directory in the target repo where generated static HTML block files are copied. |
-| `destination.json` | No | Directory in the target repo where generated resolved token JSON and metadata JSON files are copied when the target has a runtime or tooling consumer. |
-| `destination.manifest` | No | File path in the target repo for `manifest.json` when the target needs an artifact lookup contract. |
-| `delivery.provider` | No | Currently expected to be `github` when present. |
-| `delivery.branchPrefix` | No | Prefix for delivery branches. Defaults to `tokens/`. |
-| `delivery.branchName` | No | Fixed delivery branch name. Usually omit so the script derives one from project and manifest version. |
-| `delivery.title` | No | Custom PR/MR title. |
-| `delivery.body` | No | Custom PR/MR body. |
-| `delivery.reviewers` | No | GitHub reviewers to request. |
-| `delivery.labels` | No | GitHub labels to add. |
+| Field                   | Required | Meaning                                                                                                                                                |
+| ----------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `project`               | Yes      | Project id. Must match `projects.config.json[].id` and the built `dist/{project-id}` folder.                                                           |
+| `repo`                  | Yes      | Target GitHub repository. Use `owner/repo` or a GitHub URL accepted by `gh repo clone`.                                                                |
+| `branch`                | Yes      | Target base branch for the delivery PR/MR. Usually `main`.                                                                                             |
+| `source`                | Yes      | Built artifact folder in this repo, usually `dist/{project-id}`.                                                                                       |
+| `destination.css`       | Yes      | Directory in the target repo where generated CSS token files are copied.                                                                               |
+| `destination.html`      | Yes      | Directory in the target repo where generated static HTML block files are copied.                                                                       |
+| `destination.json`      | No       | Directory in the target repo where generated resolved token JSON and metadata JSON files are copied when the target has a runtime or tooling consumer. |
+| `destination.manifest`  | No       | File path in the target repo for `manifest.json` when the target needs an artifact lookup contract.                                                    |
+| `delivery.provider`     | No       | Currently expected to be `github` when present.                                                                                                        |
+| `delivery.branchPrefix` | No       | Prefix for delivery branches. Defaults to `tokens/`.                                                                                                   |
+| `delivery.branchName`   | No       | Fixed delivery branch name. Usually omit so the script derives one from project and manifest version.                                                  |
+| `delivery.title`        | No       | Custom PR/MR title.                                                                                                                                    |
+| `delivery.body`         | No       | Custom PR/MR body.                                                                                                                                     |
+| `delivery.reviewers`    | No       | GitHub reviewers to request.                                                                                                                           |
+| `delivery.labels`       | No       | GitHub labels to add.                                                                                                                                  |
 
 ### Mapping Model
 
@@ -195,21 +195,33 @@ dist/project-a/css/project-a.light.tokens.css
 Target project examples should consume generated CSS through delivered paths:
 
 ```css
-@import './tokens/css/project-a.tokens.css';
+@import "./tokens/css/project-a.tokens.css";
 ```
 
-or:
-
-```css
-@import './tokens/css/project-a.light.tokens.css';
-@import './tokens/css/project-a.dark.tokens.css';
-```
-
-Then switch themes with friendly theme names:
+The aggregate file includes all color schemes with explicit selector blocks.
+Switch the full site by putting the color scheme attribute on the root
+`<html>` element:
 
 ```html
-<html data-theme="light">
+<html data-color-scheme="light"></html>
 ```
+
+Scoped sections or previews can override the scheme on any container:
+
+```html
+<section data-color-scheme="dark"></section>
+```
+
+Targets that only support one selected scheme can import that per-theme file
+directly:
+
+```css
+@import "./tokens/css/project-a.light.tokens.css";
+```
+
+Do not import multiple per-theme CSS files into the same runtime scope unless
+that target intentionally wants the later `:root` file to override earlier
+ones.
 
 Optional JSON and manifest delivery should be configured only when the target
 has a concrete consumer:

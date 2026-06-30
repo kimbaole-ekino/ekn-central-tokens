@@ -42,6 +42,7 @@ dist/project-a/
   css/project-a.dark.tokens.css
   json/project-a.light.resolved-tokens.json
   json/project-a.light.metadata.json
+  html/demo.html
   html/button.html
   html/hero.html
   manifest.json
@@ -103,10 +104,12 @@ needs that lookup contract.
 
 ## CSS
 
-CSS output contains theme-scoped CSS custom properties:
+CSS output contains color-scheme-scoped CSS custom properties in the aggregate
+file:
 
 ```css
-[data-theme="light"] {
+:root[data-color-scheme="light"],
+[data-color-scheme="light"] {
   --primitive-color-brand-primary: #e60000;
   --primitive-spacing-md: 16px;
 }
@@ -114,7 +117,8 @@ CSS output contains theme-scoped CSS custom properties:
 
 Style Dictionary is the primary engine for CSS generation.
 
-Per-theme outputs:
+Per-theme outputs represent one selected color scheme and therefore use plain
+`:root`:
 
 ```text
 dist/{project-id}/css/{project-id}.{theme-id}.tokens.css
@@ -126,6 +130,17 @@ Example:
 dist/project-a/css/project-a.light.tokens.css
 ```
 
+Example per-theme CSS:
+
+```css
+/* Do not edit directly, this file was auto-generated. */
+
+:root {
+  --primitive-color-brand-primary: #e60000;
+  --primitive-spacing-md: 16px;
+}
+```
+
 Aggregate output:
 
 ```text
@@ -135,9 +150,34 @@ dist/{project-id}/css/{project-id}.tokens.css
 Example:
 
 ```css
-@import './project-a.light.tokens.css';
-@import './project-a.dark.tokens.css';
+/* Do not edit directly, this file was auto-generated. */
+
+:root[data-color-scheme="light"],
+[data-color-scheme="light"] {
+  --primitive-color-brand-primary: #e60000;
+  --primitive-spacing-md: 16px;
+}
+
+:root[data-color-scheme="dark"],
+[data-color-scheme="dark"] {
+  --primitive-color-brand-primary: #b00000;
+  --primitive-spacing-md: 16px;
+}
 ```
+
+The aggregate file must not write any color scheme values directly to plain
+`:root`, because there is no default color scheme. The `:root[...]` selector is
+the primary integration path for `<html data-color-scheme="...">`; the plain
+`[data-color-scheme="..."]` selector supports scoped sections, previews, and
+isolated component demos.
+
+Generated variable names are semantic and shared by all color schemes. The
+build removes color-scheme-specific set roots from CSS variable names, including
+roots that match a scheme id such as `brand-a` and roots that are unique to one
+scheme such as `theme-light` or `theme-dark`. This prevents scheme-prefixed
+variables such as `--brand-a-primary-color` or `--theme-light-primary-color`.
+The build fails if color schemes do not expose the same final CSS variable
+names.
 
 ### Why Split CSS By Theme
 
@@ -147,15 +187,17 @@ explicit and keep target project usage simple:
 - target projects can import only the themes they support,
 - per-theme diffs are easier to review,
 - cache invalidation is narrower when only one theme changes,
-- `data-theme` values stay short and readable, such as `light` and `dark`.
+- `data-color-scheme` values stay short and readable, such as `light` and
+  `dark`.
 
 Tradeoffs:
 
 - a target that wants all themes needs either multiple imports or the aggregate
-  import file,
+  file,
 - very small projects may see more files than a single bundled CSS output,
-- target build tools must allow CSS `@import` if they consume the aggregate
-  file directly.
+- target projects that import individual per-theme files must choose exactly
+  one file for a given runtime scope because each per-theme file writes to
+  plain `:root`.
 
 The central build therefore writes both per-theme CSS and
 `{project-id}.tokens.css`. Target projects should import the aggregate file when
@@ -220,6 +262,11 @@ Output:
 ```text
 dist/{project-id}/html/{block-id}.html
 ```
+
+The build also writes `dist/{project-id}/html/demo.html` as a generated demo
+document. The demo uses `<html data-color-scheme="{theme-id}">` as the main
+integration example and may include a scoped `[data-color-scheme]` section when
+multiple schemes are available.
 
 This is a delivery artifact for target projects that need static HTML snippets.
 It is not generated from Figma layers.
