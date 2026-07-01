@@ -14,6 +14,21 @@
         "branchPrefix": "tokens/",
         "labels": []
       }
+    },
+    {
+      "project": "havas-network-websites",
+      "repo": "https://github.com/kimbaole-ekino/ekn-design-tokens-target",
+      "branch": "main",
+      "source": "dist/havas-network-websites",
+      "destination": {
+        "css": "src/styles/tokens/css",
+        "html": "src/styles/tokens/html"
+      },
+      "delivery": {
+        "provider": "github",
+        "branchPrefix": "tokens/",
+        "labels": []
+      }
     }
   ]
 }
