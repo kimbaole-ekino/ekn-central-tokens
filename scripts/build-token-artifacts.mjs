@@ -7,6 +7,7 @@ import { formattedVariables } from "style-dictionary/utils";
 import { register as registerTokensStudioTransforms } from "@tokens-studio/sd-transforms";
 import {
   getProjectsConfig,
+  isTokenLeaf,
   readJson,
   renderTemplate,
   validateTokenDocument,
@@ -194,8 +195,9 @@ function getThemesFromTokenDocument(project, tokens) {
   }
 
   const outputIds = new Set();
+  const themes = [];
 
-  return tokens.$themes.map((theme) => {
+  for (const theme of tokens.$themes) {
     if (!theme || typeof theme !== "object") {
       throw new Error(`${project.tokenFile} has an invalid theme entry.`);
     }
@@ -213,10 +215,23 @@ function getThemesFromTokenDocument(project, tokens) {
       );
     }
 
-    const outputName =
-      typeof theme.name === "string" && theme.name.trim()
-        ? theme.name
-        : theme.id;
+    themes.push(
+      ...expandThemeModeSets(
+        {
+          id: theme.id,
+          name:
+            typeof theme.name === "string" && theme.name.trim()
+              ? theme.name
+              : theme.id,
+          sets,
+        },
+        tokens,
+      ),
+    );
+  }
+
+  return themes.map((theme) => {
+    const outputName = theme.name;
     const outputId =
       themeOutputSegment(project.id, outputName) ||
       themeOutputSegment(project.id, theme.id);
@@ -234,11 +249,78 @@ function getThemesFromTokenDocument(project, tokens) {
 
     return {
       id: theme.id,
-      name: theme.name ?? theme.id,
-      sets,
+      name: theme.name,
+      sets: theme.sets,
       outputId,
     };
   });
+}
+
+function expandThemeModeSets(theme, tokens) {
+  const modeSets = getThemeModeSets(theme, tokens);
+  if (modeSets.length <= 1) return [theme];
+
+  const modeSetNames = new Set(modeSets);
+  const baseSets = theme.sets.filter((setName) => !modeSetNames.has(setName));
+
+  return modeSets.map((setName) => ({
+    id: `${theme.id}:${setName}`,
+    name: setName,
+    sets: [...baseSets, setName],
+  }));
+}
+
+function getThemeModeSets(theme, tokens) {
+  const duplicateSets = new Set();
+  const ownersByLocalPath = new Map();
+  const themePrefix = kebabSegment(theme.name);
+
+  for (const setName of theme.sets) {
+    const set = tokens[setName];
+    if (!set || typeof set !== "object" || Array.isArray(set)) continue;
+
+    for (const localPath of getTokenLocalPaths(set)) {
+      const owners = ownersByLocalPath.get(localPath) ?? [];
+      owners.push(setName);
+      ownersByLocalPath.set(localPath, owners);
+    }
+  }
+
+  for (const owners of ownersByLocalPath.values()) {
+    if (owners.length <= 1) continue;
+    for (const setName of owners) {
+      duplicateSets.add(setName);
+    }
+  }
+
+  const modeSets = theme.sets.filter((setName) => {
+    const segment = kebabSegment(setName);
+    return (
+      duplicateSets.has(setName) &&
+      (segment === themePrefix || segment.startsWith(`${themePrefix}-`))
+    );
+  });
+
+  return modeSets.length === duplicateSets.size ? modeSets : [];
+}
+
+function getTokenLocalPaths(node) {
+  const paths = [];
+
+  function walk(value, prefix) {
+    if (isTokenLeaf(value)) {
+      paths.push(prefix);
+      return;
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) return;
+
+    for (const [key, child] of Object.entries(value)) {
+      walk(child, prefix ? `${prefix}.${key}` : key);
+    }
+  }
+
+  walk(node, "");
+  return paths;
 }
 
 function themeOutputSegment(projectId, themeId) {
