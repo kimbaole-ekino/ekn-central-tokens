@@ -37,6 +37,7 @@ Example:
 
 ```text
 dist/project-a/
+  css/project-a.reference.css
   css/project-a.tokens.css
   css/project-a.light.tokens.css
   css/project-a.dark.tokens.css
@@ -92,6 +93,7 @@ Generated files are rebuildable outputs:
 ```text
 dist/{project-id}/css/{project-id}.{theme-id}.tokens.css
 dist/{project-id}/css/{project-id}.tokens.css
+dist/{project-id}/css/{project-id}.reference.css
 dist/{project-id}/json/{project-id}.{theme-id}.resolved-tokens.json
 dist/{project-id}/json/{project-id}.{theme-id}.metadata.json
 dist/{project-id}/manifest.json
@@ -104,14 +106,27 @@ needs that lookup contract.
 
 ## CSS
 
+Projects with multiple generated schemes write CSS in two layers:
+
+- `{project-id}.reference.css` contains shared reference tokens such as
+  primitives from token sets enabled in every generated scheme.
+- `{project-id}.tokens.css` and `{project-id}.{theme-id}.tokens.css` contain
+  only the semantic tokens that vary by generated scheme.
+
+Targets should load the reference file first when it exists:
+
+```html
+<link rel="stylesheet" href="project-a.reference.css" />
+<link rel="stylesheet" href="project-a.tokens.css" />
+```
+
 CSS output contains color-scheme-scoped CSS custom properties in the aggregate
 file:
 
 ```css
 :root[data-color-scheme="light"],
 [data-color-scheme="light"] {
-  --primitive-color-brand-primary: #e60000;
-  --primitive-spacing-md: 16px;
+  --color-background-primary: var(--global-color-white);
 }
 ```
 
@@ -136,8 +151,7 @@ Example per-theme CSS:
 /* Do not edit directly, this file was auto-generated. */
 
 :root {
-  --primitive-color-brand-primary: #e60000;
-  --primitive-spacing-md: 16px;
+  --color-background-primary: var(--global-color-white);
 }
 ```
 
@@ -154,14 +168,12 @@ Example:
 
 :root[data-color-scheme="light"],
 [data-color-scheme="light"] {
-  --primitive-color-brand-primary: #e60000;
-  --primitive-spacing-md: 16px;
+  --color-background-primary: var(--global-color-white);
 }
 
 :root[data-color-scheme="dark"],
 [data-color-scheme="dark"] {
-  --primitive-color-brand-primary: #b00000;
-  --primitive-spacing-md: 16px;
+  --color-background-primary: var(--global-color-black);
 }
 ```
 
@@ -203,6 +215,10 @@ The central build therefore writes both per-theme CSS and
 `{project-id}.tokens.css`. Target projects should import the aggregate file when
 they want every generated theme, or import individual theme files when they want
 explicit control.
+
+When a project emits `{project-id}.reference.css`, target projects must import it
+before either the aggregate file or a per-theme file. This keeps shared
+primitives out of every scheme block while preserving CSS variable references.
 
 ## Resolved Token JSON
 
@@ -292,6 +308,7 @@ Recommended shape:
   "buildTime": "2026-06-26T09:00:00Z",
   "sourceCommit": "abc1234",
   "css": "css/project-a.tokens.css",
+  "referenceCss": "css/project-a.reference.css",
   "themes": {
     "light": {
       "css": "css/project-a.light.tokens.css",

@@ -31,12 +31,19 @@ blocks/
       hero/
 
 scripts/
-  token-build-utils.mjs
-  validate-token-projects.mjs
-  detect-affected-token-projects.mjs
-  build-token-artifacts.mjs
-  check-stale-token-pr.mjs
-  create-target-merge-requests.mjs
+  validate-token-projects.ts
+  detect-affected-token-projects.ts
+  build-token-artifacts.ts
+  check-stale-token-pr.ts
+  create-target-merge-requests.ts
+  lib/
+    artifact-output.ts
+    html-artifacts.ts
+    project-selection.ts
+    style-dictionary.ts
+    themes.ts
+    token-utils.ts
+    types.ts
 
 projects.config.json
 targets.config.json
@@ -50,11 +57,11 @@ docs/
   source. It includes token sets, values, `$themes`, and `$metadata`.
 - `projects.config.json` defines which projects are built.
 - `blocks/` contains static HTML block contracts and examples.
-- `scripts/build-token-artifacts.mjs` orchestrates Style Dictionary token
+- `scripts/build-token-artifacts.ts` orchestrates Style Dictionary token
   processing, static HTML generation, and `manifest.json` output.
 - `targets.config.json` describes where generated artifacts are written in
   target projects.
-- `scripts/create-target-merge-requests.mjs` validates target delivery locally
+- `scripts/create-target-merge-requests.ts` validates target delivery locally
   by default and can create target project PRs/MRs in explicit apply mode.
 
 ## Commands
@@ -72,6 +79,12 @@ Validate token projects:
 
 ```bash
 npm run validate:tokens
+```
+
+Typecheck TypeScript scripts:
+
+```bash
+npm run typecheck
 ```
 
 Build generated artifacts:
@@ -147,6 +160,7 @@ Target delivery MR for project-b
 Build output is written under `dist/`:
 
 ```text
+dist/project-a/css/project-a.reference.css
 dist/project-a/css/project-a.tokens.css
 dist/project-a/css/project-a.light.tokens.css
 dist/project-a/css/project-a.dark.tokens.css
@@ -166,6 +180,12 @@ The aggregate CSS file uses:
 
 ```text
 {project-id}.tokens.css
+```
+
+When present, the shared reference CSS file uses:
+
+```text
+{project-id}.reference.css
 ```
 
 Source token files stay at:

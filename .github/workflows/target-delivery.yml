@@ -41,7 +41,7 @@ jobs:
       - run: npm ci
       - name: Detect affected token projects
         if: github.event_name == 'push'
-        run: node scripts/detect-affected-token-projects.mjs --base=${{ github.event.before }} --head=${{ github.sha }}
+        run: npm run detect:affected-projects -- --base=${{ github.event.before }} --head=${{ github.sha }}
       - name: Select requested project
         if: github.event_name == 'workflow_dispatch' && inputs.project != ''
         run: |

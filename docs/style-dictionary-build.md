@@ -4,7 +4,7 @@ Style Dictionary is the primary build engine for token processing in this
 central repository.
 
 The repository uses the official `style-dictionary` npm package with
-`@tokens-studio/sd-transforms` from `scripts/build-token-artifacts.mjs`. The
+`@tokens-studio/sd-transforms` from `scripts/lib/style-dictionary.ts`. The
 script owns repository orchestration; Style Dictionary owns token transformation
 and formatting. The generated artifact contract is documented in
 `generated-artifacts.md`; this file focuses on how the build produces that
@@ -78,8 +78,14 @@ npm run build:artifacts -- --project=project-c
 Current implementation:
 
 ```text
-scripts/build-token-artifacts.mjs
-scripts/token-build-utils.mjs
+scripts/build-token-artifacts.ts
+scripts/lib/artifact-output.ts
+scripts/lib/html-artifacts.ts
+scripts/lib/project-selection.ts
+scripts/lib/style-dictionary.ts
+scripts/lib/themes.ts
+scripts/lib/token-utils.ts
+scripts/lib/types.ts
 style-dictionary
 @tokens-studio/sd-transforms
 ```
@@ -96,8 +102,10 @@ The build currently:
 - applies the Tokens Studio preprocessor and `tokens-studio` transform group,
 - uses Style Dictionary to resolve aliases,
 - uses Style Dictionary to write CSS custom properties,
+- writes shared reference CSS once when token sets are enabled in every
+  generated color scheme,
 - writes one `:root` CSS file per theme/color scheme and one aggregate CSS file
-  with explicit `data-color-scheme` selector blocks,
+  with explicit `data-color-scheme` selector blocks for semantic scheme tokens,
 - uses a Style Dictionary custom format to write resolved token JSON,
 - uses a Style Dictionary custom format to write metadata JSON,
 - renders static HTML examples and a full generated demo page,
@@ -120,33 +128,21 @@ transforms: ["name/kebab"];
 This is intentionally a low-risk integration:
 
 - the dependency version is compatible with Style Dictionary 4,
-- token document validation remains in `scripts/token-build-utils.mjs`,
+- token document validation remains in `scripts/lib/token-utils.ts`,
 - project/theme selection still comes from `$themes[].selectedTokenSets`,
 - custom formats still own resolved token JSON and metadata JSON shape.
 
 ## Style Dictionary Structure
 
-Current implementation is script-local. If this grows, move Style Dictionary
-configuration into:
+The TypeScript build is split so the command entrypoint stays small:
 
 ```text
-build/
-  style-dictionary/
-    config.mjs
-    transforms.mjs
-    formats.mjs
-    actions.mjs
-```
-
-Recommended scripts:
-
-```json
-{
-  "scripts": {
-    "build:style-dictionary": "node build/style-dictionary/config.mjs",
-    "build:artifacts": "npm run build:style-dictionary && node scripts/build-html-artifacts.mjs"
-  }
-}
+scripts/build-token-artifacts.ts        # command orchestration
+scripts/lib/style-dictionary.ts         # SD config, formats, CSS naming
+scripts/lib/themes.ts                   # theme and mode-set expansion
+scripts/lib/token-utils.ts              # validation and JSON helpers
+scripts/lib/html-artifacts.ts           # demo and block HTML output
+scripts/lib/artifact-output.ts          # filesystem output helpers
 ```
 
 ## Output Naming
@@ -158,6 +154,7 @@ layout here.
 The main outputs are:
 
 ```text
+dist/{project-id}/css/{project-id}.reference.css
 dist/{project-id}/css/{project-id}.{theme-id}.tokens.css
 dist/{project-id}/css/{project-id}.tokens.css
 dist/{project-id}/json/{project-id}.{theme-id}.resolved-tokens.json
@@ -172,7 +169,7 @@ Aggregate CSS selectors use friendly generated theme names as color scheme ids:
 ```css
 :root[data-color-scheme="light"],
 [data-color-scheme="light"] {
-  --primitive-color-brand-primary: #e60000;
+  --color-background-primary: var(--global-color-white);
 }
 ```
 
@@ -182,18 +179,27 @@ also emitted so flexible components, sections, previews, and isolated demos can
 scope color scheme overrides.
 
 The generated aggregate CSS file contains one selector block per theme/color
-scheme. It must not write scheme values directly to plain `:root` because there
-is no default color scheme:
+scheme. When reference token sets are shared by every generated scheme, the
+aggregate file contains only semantic scheme tokens and depends on
+`{project-id}.reference.css` being loaded first. It must not write scheme values
+directly to plain `:root` because there is no default color scheme:
 
 ```css
+/* {project-id}.reference.css */
+:root {
+  --global-color-white: #ffffff;
+  --global-color-black: #000000;
+}
+
+/* {project-id}.tokens.css */
 :root[data-color-scheme="light"],
 [data-color-scheme="light"] {
-  --primitive-color-brand-primary: #e60000;
+  --color-background-primary: var(--global-color-white);
 }
 
 :root[data-color-scheme="dark"],
 [data-color-scheme="dark"] {
-  --primitive-color-brand-primary: #b00000;
+  --color-background-primary: var(--global-color-black);
 }
 ```
 
@@ -201,23 +207,23 @@ Per-theme CSS files represent one selected scheme and can use plain `:root`:
 
 ```css
 :root {
-  --primitive-color-brand-primary: #e60000;
+  --color-background-primary: var(--global-color-white);
 }
 ```
 
 Aliases should become CSS references when possible:
 
 ```css
---component-button-background-primary: var(--primitive-color-brand-primary);
+--color-background-primary: var(--global-color-white);
 ```
 
 Resolved metadata should preserve both:
 
 ```json
 {
-  "value": "#e60000",
-  "originalValue": "{primitive.color.brand.primary}",
-  "cssVariable": "--component-button-background-primary",
+  "value": "#ffffff",
+  "originalValue": "{global.color.white}",
+  "cssVariable": "--color-background-primary",
   "theme": "light"
 }
 ```

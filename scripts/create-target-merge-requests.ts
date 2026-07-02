@@ -1,10 +1,57 @@
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
 import {
   getProjectsConfig,
   getTargetsConfig,
-} from "./token-build-utils.mjs";
+  readJson,
+} from "./lib/token-utils.js";
+import type {
+  TargetConfig,
+  TargetDestination,
+  TokenProject,
+} from "./lib/types.js";
+
+interface ArtifactManifest {
+  version: string;
+  [key: string]: unknown;
+}
+
+interface ValidatedTarget extends TargetConfig {
+  project: string;
+  repo: string;
+  branch: string;
+  source: string;
+  destination: TargetDestination & {
+    css: string;
+    html: string;
+  };
+  delivery?: Record<string, unknown>;
+}
+
+interface DeliveryMapping {
+  label: string;
+  source: string;
+  destination: string;
+  type: "directory" | "file";
+}
+
+interface Delivery {
+  target: ValidatedTarget;
+  sourceDir: string;
+  manifest: ArtifactManifest;
+  branchName: string;
+  title: string;
+  body: string;
+  mappings: DeliveryMapping[];
+  reviewers: string[];
+  labels: string[];
+}
+
+interface RunOptions {
+  cwd?: string;
+  stdio?: "inherit" | "pipe" | "ignore";
+}
 
 const rootDir = process.cwd();
 const args = new Set(process.argv.slice(2));
@@ -46,14 +93,15 @@ if (isApplyMode) {
   }
 }
 
-for (const target of targets) {
-  const project = validateTarget(target);
+for (const rawTarget of targets) {
+  const { target, project } = validateTarget(rawTarget);
   if (isPendingFirstSyncProject(project)) {
     console.log(
       `Skipping target delivery for ${target.project}: ${project.tokenFile} does not exist yet. It will be created by the first plugin PR/MR.`,
     );
     continue;
   }
+
   validateBuiltArtifacts(target);
   const delivery = buildDelivery(target);
   printDelivery(delivery, isApplyMode ? "apply" : "dry-run");
@@ -63,21 +111,24 @@ for (const target of targets) {
   }
 }
 
-function getArgValue(name) {
+function getArgValue(name: string): string | undefined {
   const prefix = `${name}=`;
   const value = process.argv.find((arg) => arg.startsWith(prefix));
   return value ? value.slice(prefix.length) : undefined;
 }
 
-function getSelectedProjectIds() {
-  const values = [];
+function getSelectedProjectIds(): Set<string> | null {
+  const values: string[] = [];
   for (const arg of process.argv.slice(2)) {
     if (arg.startsWith("--projects=")) {
       values.push(...arg.slice("--projects=".length).split(","));
     }
   }
 
-  if ("TARGET_DELIVERY_PROJECTS" in process.env) {
+  if (
+    "TARGET_DELIVERY_PROJECTS" in process.env &&
+    typeof process.env.TARGET_DELIVERY_PROJECTS === "string"
+  ) {
     values.push(...process.env.TARGET_DELIVERY_PROJECTS.split(","));
   }
 
@@ -85,8 +136,11 @@ function getSelectedProjectIds() {
   return values.length > 0 ? new Set(selected) : null;
 }
 
-function validateTarget(target) {
-  const requiredStrings = [
+function validateTarget(target: TargetConfig): {
+  target: ValidatedTarget;
+  project: TokenProject;
+} {
+  const requiredStrings: [string, unknown][] = [
     ["project", target.project],
     ["repo", target.repo],
     ["branch", target.branch],
@@ -111,14 +165,17 @@ function validateTarget(target) {
     );
   }
 
-  return project;
+  return {
+    target: target as ValidatedTarget,
+    project,
+  };
 }
 
-function isPendingFirstSyncProject(project) {
+function isPendingFirstSyncProject(project: TokenProject): boolean {
   return !fs.existsSync(path.join(rootDir, project.tokenFile));
 }
 
-function validateBuiltArtifacts(target) {
+function validateBuiltArtifacts(target: ValidatedTarget): void {
   const sourceDir = path.join(rootDir, target.source);
   const manifestPath = path.join(sourceDir, "manifest.json");
   if (!fs.existsSync(manifestPath)) {
@@ -128,19 +185,20 @@ function validateBuiltArtifacts(target) {
   }
 }
 
-function buildDelivery(target) {
+function buildDelivery(target: ValidatedTarget): Delivery {
   const sourceDir = path.join(rootDir, target.source);
-  const manifest = JSON.parse(
-    fs.readFileSync(path.join(sourceDir, "manifest.json"), "utf8"),
+  const manifest = readJson<ArtifactManifest>(
+    path.join(sourceDir, "manifest.json"),
   );
+  const deliveryConfig = target.delivery ?? {};
   const branchName =
-    target.delivery?.branchName ??
-    `${target.delivery?.branchPrefix ?? "tokens/"}${target.project}-${manifest.version}`;
+    getString(deliveryConfig.branchName) ??
+    `${getString(deliveryConfig.branchPrefix) ?? "tokens/"}${target.project}-${manifest.version}`;
   const title =
-    target.delivery?.title ??
+    getString(deliveryConfig.title) ??
     `Update ${target.project} design token artifacts`;
   const body =
-    target.delivery?.body ??
+    getString(deliveryConfig.body) ??
     [
       "Automated delivery from `ekn-central-tokens`.",
       "",
@@ -159,13 +217,16 @@ function buildDelivery(target) {
     title,
     body,
     mappings: getMappings(sourceDir, target.destination),
-    reviewers: target.delivery?.reviewers ?? [],
-    labels: target.delivery?.labels ?? [],
+    reviewers: getStringArray(deliveryConfig.reviewers),
+    labels: getStringArray(deliveryConfig.labels),
   };
 }
 
-function getMappings(sourceDir, destination) {
-  const mappings = [
+function getMappings(
+  sourceDir: string,
+  destination: ValidatedTarget["destination"],
+): DeliveryMapping[] {
+  const mappings: DeliveryMapping[] = [
     {
       label: "css",
       source: path.join(sourceDir, "css"),
@@ -207,7 +268,7 @@ function getMappings(sourceDir, destination) {
   return mappings;
 }
 
-function printDelivery(delivery, mode) {
+function printDelivery(delivery: Delivery, mode: "apply" | "dry-run"): void {
   console.log(
     [
       `Target delivery MR for ${delivery.target.project}`,
@@ -227,7 +288,7 @@ function printDelivery(delivery, mode) {
   );
 }
 
-function createTargetMergeRequest(delivery) {
+function createTargetMergeRequest(delivery: Delivery): void {
   const workDir = path.join(rootDir, ".delivery", delivery.target.project);
   fs.rmSync(workDir, { recursive: true, force: true });
   fs.mkdirSync(path.dirname(workDir), { recursive: true });
@@ -242,13 +303,17 @@ function createTargetMergeRequest(delivery) {
     delivery.target.branch,
   ]);
 
-  run("git", [
-    "remote",
-    "set-url",
-    "--push",
-    "origin",
-    getAuthenticatedGitHubRemote(delivery.target.repo),
-  ], { cwd: workDir });
+  run(
+    "git",
+    [
+      "remote",
+      "set-url",
+      "--push",
+      "origin",
+      getAuthenticatedGitHubRemote(delivery.target.repo),
+    ],
+    { cwd: workDir },
+  );
   run("git", ["checkout", "-B", delivery.branchName], { cwd: workDir });
 
   for (const mapping of delivery.mappings) {
@@ -266,29 +331,44 @@ function createTargetMergeRequest(delivery) {
   }).trim();
 
   if (!status) {
-    console.log(`No target changes for ${delivery.target.project}; skipping PR.`);
+    console.log(
+      `No target changes for ${delivery.target.project}; skipping PR.`,
+    );
     return;
   }
 
-  run("git", [
-    "config",
-    "user.name",
-    process.env.TARGET_DELIVERY_GIT_USER_NAME ?? "ekn-token-delivery-bot",
-  ], { cwd: workDir });
-  run("git", [
-    "config",
-    "user.email",
-    process.env.TARGET_DELIVERY_GIT_USER_EMAIL ??
-      "ekn-token-delivery-bot@example.invalid",
-  ], { cwd: workDir });
+  run(
+    "git",
+    [
+      "config",
+      "user.name",
+      process.env.TARGET_DELIVERY_GIT_USER_NAME ??
+        "ekn-token-delivery-bot",
+    ],
+    { cwd: workDir },
+  );
+  run(
+    "git",
+    [
+      "config",
+      "user.email",
+      process.env.TARGET_DELIVERY_GIT_USER_EMAIL ??
+        "ekn-token-delivery-bot@example.invalid",
+    ],
+    { cwd: workDir },
+  );
   run("git", ["commit", "-m", delivery.title], { cwd: workDir });
-  run("git", [
-    "push",
-    "--force-with-lease",
-    "--set-upstream",
-    "origin",
-    delivery.branchName,
-  ], { cwd: workDir });
+  run(
+    "git",
+    [
+      "push",
+      "--force-with-lease",
+      "--set-upstream",
+      "origin",
+      delivery.branchName,
+    ],
+    { cwd: workDir },
+  );
 
   const existingPr = findOpenPullRequest(delivery);
   if (existingPr) {
@@ -332,7 +412,7 @@ function createTargetMergeRequest(delivery) {
   console.log(`Created target PR: ${prUrl}`);
 }
 
-function findOpenPullRequest(delivery) {
+function findOpenPullRequest(delivery: Delivery): string {
   return run(
     "gh",
     [
@@ -355,7 +435,7 @@ function findOpenPullRequest(delivery) {
   ).trim();
 }
 
-function getAuthenticatedGitHubRemote(repo) {
+function getAuthenticatedGitHubRemote(repo: string): string {
   const token = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
   if (!token) {
     throw new Error(
@@ -367,14 +447,14 @@ function getAuthenticatedGitHubRemote(repo) {
   return `https://x-access-token:${encodeURIComponent(token)}@github.com/${ownerRepo}.git`;
 }
 
-function getGitHubOwnerRepo(repo) {
+function getGitHubOwnerRepo(repo: string): string {
   const shorthandMatch = repo.match(/^([^/\s]+)\/([^/\s]+?)(?:\.git)?$/);
-  if (shorthandMatch) {
+  if (shorthandMatch?.[1] && shorthandMatch[2]) {
     return `${shorthandMatch[1]}/${shorthandMatch[2]}`;
   }
 
   const sshMatch = repo.match(/^git@github\.com:([^/\s]+)\/(.+?)(?:\.git)?$/);
-  if (sshMatch) {
+  if (sshMatch?.[1] && sshMatch[2]) {
     return `${sshMatch[1]}/${sshMatch[2]}`;
   }
 
@@ -395,7 +475,7 @@ function getGitHubOwnerRepo(repo) {
   );
 }
 
-function assertCommand(command, args) {
+function assertCommand(command: string, args: string[]): void {
   try {
     run(command, args, { stdio: "ignore" });
   } catch {
@@ -403,7 +483,7 @@ function assertCommand(command, args) {
   }
 }
 
-function run(command, args, options = {}) {
+function run(command: string, args: string[], options: RunOptions = {}): string {
   return execFileSync(command, args, {
     cwd: options.cwd ?? rootDir,
     env: {
@@ -413,4 +493,14 @@ function run(command, args, options = {}) {
     encoding: "utf8",
     stdio: options.stdio ?? "inherit",
   });
+}
+
+function getString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function getStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
 }

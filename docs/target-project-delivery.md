@@ -185,6 +185,9 @@ token-definitions/projects/project-c/tokens.json
 Generated artifact names are preserved during delivery. For example:
 
 ```text
+dist/project-a/css/project-a.reference.css
+-> src/styles/tokens/css/project-a.reference.css
+
 dist/project-a/css/project-a.tokens.css
 -> src/styles/tokens/css/project-a.tokens.css
 
@@ -195,8 +198,14 @@ dist/project-a/css/project-a.light.tokens.css
 Target project examples should consume generated CSS through delivered paths:
 
 ```css
+@import "./tokens/css/project-a.reference.css";
 @import "./tokens/css/project-a.tokens.css";
 ```
+
+When a `referenceCss` entry exists in `manifest.json`, import the reference CSS
+before aggregate or per-theme CSS. The reference file contains shared primitives
+once; scheme files contain semantic variables that may reference those
+primitives.
 
 The aggregate file includes all color schemes with explicit selector blocks.
 Switch the full site by putting the color scheme attribute on the root
@@ -216,6 +225,7 @@ Targets that only support one selected scheme can import that per-theme file
 directly:
 
 ```css
+@import "./tokens/css/project-a.reference.css";
 @import "./tokens/css/project-a.light.tokens.css";
 ```
 

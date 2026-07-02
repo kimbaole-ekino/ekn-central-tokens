@@ -5,7 +5,13 @@ import {
   getTargetsConfig,
   readJson,
   validateTokenDocument,
-} from "./token-build-utils.mjs";
+} from "./lib/token-utils.js";
+import type {
+  ProjectsConfig,
+  TargetConfig,
+  TokenDocument,
+  TokenProject,
+} from "./lib/types.js";
 
 try {
   main();
@@ -14,11 +20,11 @@ try {
   process.exitCode = 1;
 }
 
-function main() {
+function main(): void {
   const rootDir = process.cwd();
   const config = getProjectsConfig(rootDir);
   const targetsConfig = getTargetsConfig(rootDir);
-  const projectIds = new Set();
+  const projectIds = new Set<string>();
   let validatedTokenFiles = 0;
   let pendingTokenFiles = 0;
 
@@ -34,7 +40,7 @@ function main() {
       );
       continue;
     }
-    const tokens = readJson(tokenPath);
+    const tokens = readJson<TokenDocument>(tokenPath);
     validateTokenDocument(tokens, project.tokenFile);
     validatedTokenFiles += 1;
   }
@@ -44,7 +50,10 @@ function main() {
   );
 }
 
-function validateProjectsConfig(projectsConfig, projectIds) {
+function validateProjectsConfig(
+  projectsConfig: ProjectsConfig,
+  projectIds: Set<string>,
+): void {
   if (!Array.isArray(projectsConfig.projects)) {
     throw new Error('projects.config.json: "projects" must be an array.');
   }
@@ -61,7 +70,9 @@ function validateProjectsConfig(projectsConfig, projectIds) {
     projectIds.add(project.id);
 
     if (!project.tokenFile.endsWith("/tokens.json")) {
-      throw new Error(`${pathPrefix}.tokenFile must point to a tokens.json file.`);
+      throw new Error(
+        `${pathPrefix}.tokenFile must point to a tokens.json file.`,
+      );
     }
     if (path.isAbsolute(project.tokenFile) || project.tokenFile.includes("..")) {
       throw new Error(`${pathPrefix}.tokenFile must be repository-relative.`);
@@ -79,13 +90,20 @@ function validateProjectsConfig(projectsConfig, projectIds) {
   }
 }
 
-function validateTargetsConfig(targetsConfig, projectsConfig, projectIds) {
+function validateTargetsConfig(
+  targetsConfig: { targets?: TargetConfig[] },
+  projectsConfig: ProjectsConfig,
+  projectIds: Set<string>,
+): void {
   if (!Array.isArray(targetsConfig.targets)) {
     throw new Error('targets.config.json: "targets" must be an array.');
   }
 
   const outputByProject = new Map(
-    projectsConfig.projects.map((project) => [project.id, project.outputDir]),
+    (projectsConfig.projects ?? []).map((project) => [
+      project.id,
+      project.outputDir,
+    ]),
   );
 
   for (const [index, target] of targetsConfig.targets.entries()) {
@@ -98,7 +116,9 @@ function validateTargetsConfig(targetsConfig, projectsConfig, projectIds) {
     requireString(target.destination?.html, `${pathPrefix}.destination.html`);
 
     if (!projectIds.has(target.project)) {
-      throw new Error(`${pathPrefix}.project references unknown project ${target.project}.`);
+      throw new Error(
+        `${pathPrefix}.project references unknown project ${target.project}.`,
+      );
     }
 
     const expectedSource = outputByProject.get(target.project);
@@ -113,13 +133,15 @@ function validateTargetsConfig(targetsConfig, projectsConfig, projectIds) {
         throw new Error(`${pathPrefix}.destination.${field} must be a string.`);
       }
       if (path.isAbsolute(value) || value.includes("..")) {
-        throw new Error(`${pathPrefix}.destination.${field} must be target-repository-relative.`);
+        throw new Error(
+          `${pathPrefix}.destination.${field} must be target-repository-relative.`,
+        );
       }
     }
   }
 }
 
-function requireString(value, field) {
+function requireString(value: unknown, field: string): asserts value is string {
   if (typeof value !== "string" || !value.trim()) {
     throw new Error(`${field} must be a non-empty string.`);
   }

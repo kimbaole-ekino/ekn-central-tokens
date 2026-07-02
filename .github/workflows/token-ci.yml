@@ -25,7 +25,7 @@ jobs:
       - run: npm ci
       - name: Detect affected token projects
         if: github.event_name == 'pull_request'
-        run: node scripts/detect-affected-token-projects.mjs --base=${{ github.event.pull_request.base.sha }} --head=${{ github.sha }}
+        run: npm run detect:affected-projects -- --base=${{ github.event.pull_request.base.sha }} --head=${{ github.sha }}
       - run: npm run validate:tokens
       - run: npm run check:stale-token-pr
       - run: npm run build:artifacts

@@ -1,43 +1,60 @@
 import fs from "node:fs";
 import path from "node:path";
+import type {
+  ProjectsConfig,
+  TargetConfig,
+  TargetsConfig,
+  TokenDocument,
+  TokenLeaf,
+  TokenNode,
+  TokensStudioTheme,
+} from "./types.js";
 
-export function readJson(filePath) {
-  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+export function readJson<T = unknown>(filePath: string): T {
+  return JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
 }
 
-export function writeFile(filePath, content) {
+export function writeFile(filePath: string, content: string): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, content);
 }
 
-export function getProjectsConfig(rootDir) {
+export function getProjectsConfig(rootDir: string): ProjectsConfig {
   return readJson(path.join(rootDir, "projects.config.json"));
 }
 
-export function getTargetsConfig(rootDir) {
+export function getTargetsConfig(rootDir: string): TargetsConfig {
   return readJson(path.join(rootDir, "targets.config.json"));
 }
 
-export function getTokenSetNames(document) {
+export function getTokenSetNames(document: TokenDocument): string[] {
   const actual = Object.keys(document).filter((key) => !key.startsWith("$"));
-  const order = Array.isArray(document.$metadata?.tokenSetOrder)
-    ? document.$metadata.tokenSetOrder.filter((name) => actual.includes(name))
+  const metadata = asObject(document.$metadata);
+  const tokenSetOrder = Array.isArray(metadata?.tokenSetOrder)
+    ? metadata.tokenSetOrder.filter(
+        (name): name is string =>
+          typeof name === "string" && actual.includes(name),
+      )
     : [];
-  return [...order, ...actual.filter((name) => !order.includes(name))];
+  return [
+    ...tokenSetOrder,
+    ...actual.filter((name) => !tokenSetOrder.includes(name)),
+  ];
 }
 
 export function flattenTokens(
-  document,
+  document: TokenDocument,
   selectedSets = getTokenSetNames(document),
-) {
-  const output = new Map();
+): Map<string, TokenLeaf> {
+  const output = new Map<string, TokenLeaf>();
 
-  function walk(node, prefix) {
+  function walk(node: unknown, prefix: string): void {
+    if (!isObject(node)) return;
     for (const [key, value] of Object.entries(node)) {
       const currentPath = prefix ? `${prefix}.${key}` : key;
       if (isTokenLeaf(value)) {
         output.set(currentPath, value);
-      } else if (value && typeof value === "object" && !Array.isArray(value)) {
+      } else if (isObject(value)) {
         walk(value, currentPath);
       }
     }
@@ -45,7 +62,7 @@ export function flattenTokens(
 
   for (const setName of selectedSets) {
     const set = document[setName];
-    if (set && typeof set === "object" && !Array.isArray(set)) {
+    if (isObject(set)) {
       walk(set, setName);
     }
   }
@@ -53,11 +70,9 @@ export function flattenTokens(
   return output;
 }
 
-export function isTokenLeaf(value) {
+export function isTokenLeaf(value: unknown): value is TokenLeaf {
   return (
-    value &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
+    isObject(value) &&
     ("value" in value ||
       "type" in value ||
       "$value" in value ||
@@ -65,39 +80,46 @@ export function isTokenLeaf(value) {
   );
 }
 
-export function getLeafValue(leaf) {
+export function getLeafValue(leaf: TokenLeaf): unknown {
   return "value" in leaf ? leaf.value : leaf.$value;
 }
 
-export function getLeafType(leaf) {
+export function getLeafType(leaf: TokenLeaf): unknown {
   return "type" in leaf ? leaf.type : leaf.$type;
 }
 
-export function cssVariableName(tokenPath) {
+export function cssVariableName(tokenPath: string): string {
   return `--${tokenPath
     .replace(/[^a-zA-Z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .toLowerCase()}`;
 }
 
-export function resolveAlias(value, tokens, chain = []) {
+export function resolveAlias(
+  value: unknown,
+  tokens: Map<string, TokenLeaf>,
+  chain: string[] = [],
+): unknown {
   if (typeof value !== "string") return value;
   const match = value.match(/^\{([^{}]+)\}$/);
   if (!match) return value;
-  const path = match[1];
-  if (chain.includes(path)) {
-    throw new Error(`Cyclic alias: ${[...chain, path].join(" -> ")}`);
+  const aliasPath = match[1]!;
+  if (chain.includes(aliasPath)) {
+    throw new Error(`Cyclic alias: ${[...chain, aliasPath].join(" -> ")}`);
   }
-  const target = tokens.get(path);
+  const target = tokens.get(aliasPath);
   if (!target) {
-    throw new Error(`Unresolved alias: ${path}`);
+    throw new Error(`Unresolved alias: ${aliasPath}`);
   }
-  return resolveAlias(getLeafValue(target), tokens, [...chain, path]);
+  return resolveAlias(getLeafValue(target), tokens, [...chain, aliasPath]);
 }
 
-export function validateTokenDocument(document, sourceName) {
-  const errors = [];
-  const stableIds = new Map();
+export function validateTokenDocument(
+  document: TokenDocument,
+  sourceName: string,
+): void {
+  const errors: string[] = [];
+  const stableIds = new Map<string, string>();
   const tokenSets = new Set(getTokenSetNames(document));
   const allTokens = flattenTokens(document);
 
@@ -105,7 +127,7 @@ export function validateTokenDocument(document, sourceName) {
     errors.push("root: missing non-empty $themes array");
   }
 
-  function validateNode(node, currentPath) {
+  function validateNode(node: unknown, currentPath: string): void {
     if (isTokenLeaf(node)) {
       const value = getLeafValue(node);
       const type = getLeafType(node);
@@ -121,7 +143,7 @@ export function validateTokenDocument(document, sourceName) {
       return;
     }
 
-    if (!node || typeof node !== "object" || Array.isArray(node)) {
+    if (!isObject(node)) {
       errors.push(`${currentPath || "root"}: invalid node`);
       return;
     }
@@ -145,8 +167,8 @@ export function validateTokenDocument(document, sourceName) {
 
   validateNode(document, "");
 
-  for (const theme of document.$themes ?? []) {
-    if (!theme || typeof theme !== "object" || Array.isArray(theme)) {
+  for (const theme of getThemeEntries(document)) {
+    if (!isObject(theme)) {
       errors.push("root.$themes: invalid theme entry");
       continue;
     }
@@ -175,7 +197,7 @@ export function validateTokenDocument(document, sourceName) {
         resolveAlias(getLeafValue(leaf), flattened);
       } catch (error) {
         errors.push(
-          `${theme.id}:${tokenPath}: ${formatAliasError(
+          `${String(theme.id)}:${tokenPath}: ${formatAliasError(
             error,
             allTokens,
             selectedSets,
@@ -190,21 +212,11 @@ export function validateTokenDocument(document, sourceName) {
   }
 }
 
-function formatAliasError(error, allTokens, selectedSets) {
-  const message = error instanceof Error ? error.message : String(error);
-  const match = message.match(/^Unresolved alias: (.+)$/);
-  if (!match) return message;
-
-  const aliasPath = match[1];
-  const target = allTokens.get(aliasPath);
-  if (!target) return message;
-
-  const targetSet = aliasPath.split(".")[0];
-  const activeSets = selectedSets.length > 0 ? selectedSets.join(", ") : "none";
-  return `${message}; ${targetSet} exists but is not active for this theme (active sets: ${activeSets})`;
-}
-
-export function renderTemplate(template, props, slots = {}) {
+export function renderTemplate(
+  template: string,
+  props: Record<string, unknown>,
+  slots: Record<string, string> = {},
+): string {
   let rendered = template;
   for (const [slotName, value] of Object.entries(slots)) {
     rendered = rendered.replaceAll(`{{{ slots.${slotName} }}}`, value);
@@ -215,10 +227,50 @@ export function renderTemplate(template, props, slots = {}) {
   return rendered;
 }
 
-export function escapeHtml(value) {
+export function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+export function asObject(value: unknown): Record<string, unknown> | null {
+  return isObject(value) ? value : null;
+}
+
+export function isObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+export function getThemeEntries(document: TokenDocument): TokensStudioTheme[] {
+  return Array.isArray(document.$themes)
+    ? (document.$themes as TokensStudioTheme[])
+    : [];
+}
+
+export function compactObject<T extends Record<string, unknown>>(
+  object: T,
+): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(object).filter(([, value]) => value !== undefined),
+  ) as Partial<T>;
+}
+
+function formatAliasError(
+  error: unknown,
+  allTokens: Map<string, TokenLeaf>,
+  selectedSets: string[],
+): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const match = message.match(/^Unresolved alias: (.+)$/);
+  if (!match) return message;
+
+  const aliasPath = match[1]!;
+  const target = allTokens.get(aliasPath);
+  if (!target) return message;
+
+  const targetSet = aliasPath.split(".")[0];
+  const activeSets = selectedSets.length > 0 ? selectedSets.join(", ") : "none";
+  return `${message}; ${targetSet} exists but is not active for this theme (active sets: ${activeSets})`;
 }

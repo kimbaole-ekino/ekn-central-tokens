@@ -79,15 +79,15 @@ in CI when an event provides a zero/expired commit reference.
 
 ## Current Implementation
 
-- `scripts/detect-affected-token-projects.mjs` detects affected project IDs.
+- `scripts/detect-affected-token-projects.ts` detects affected project IDs.
 - `.github/workflows/token-ci.yml` runs the detector for pull requests.
 - `.github/workflows/target-delivery.yml` runs the detector after pushes to
   `main`.
 - The detector writes `TOKEN_PROJECTS` for build filtering.
 - The detector writes `TARGET_DELIVERY_PROJECTS` for target delivery filtering.
-- `scripts/build-token-artifacts.mjs` respects `TOKEN_PROJECTS`,
+- `scripts/build-token-artifacts.ts` respects `TOKEN_PROJECTS`,
   `--project=...`, and `--projects=...`.
-- `scripts/create-target-merge-requests.mjs` respects
+- `scripts/create-target-merge-requests.ts` respects
   `TARGET_DELIVERY_PROJECTS`, `--project=...`, and `--projects=...`.
 
 Local full validation still builds all projects by default:

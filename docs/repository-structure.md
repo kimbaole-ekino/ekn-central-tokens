@@ -29,12 +29,19 @@ ekn-central-tokens/
           template.html
 
   scripts/
-    token-build-utils.mjs
-    validate-token-projects.mjs
-    build-token-artifacts.mjs
-    check-stale-token-pr.mjs
-    detect-affected-token-projects.mjs
-    create-target-merge-requests.mjs
+    validate-token-projects.ts
+    build-token-artifacts.ts
+    check-stale-token-pr.ts
+    detect-affected-token-projects.ts
+    create-target-merge-requests.ts
+    lib/
+      artifact-output.ts
+      html-artifacts.ts
+      project-selection.ts
+      style-dictionary.ts
+      themes.ts
+      token-utils.ts
+      types.ts
 
   projects.config.json
   targets.config.json
