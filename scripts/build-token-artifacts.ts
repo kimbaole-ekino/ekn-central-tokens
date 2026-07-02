@@ -81,7 +81,7 @@ for (const project of projects) {
 
   const colorSchemeCssBlocks: string[] = [];
   const colorSchemeVariableNames = new Map<string, string[]>();
-  let referenceCssBlock: string | null = null;
+  const referenceCssBlocks: string[] = [];
 
   for (const theme of themes) {
     const artifactBase = `${project.id}.${theme.outputId}`;
@@ -104,8 +104,8 @@ for (const project of projects) {
       resolvedTokens: resolvedTokensFile,
       metadata: metadataFile,
     };
-    if (splitReferenceCss && referenceCssBlock === null) {
-      referenceCssBlock = colorSchemeOutput.referenceCssBlock;
+    if (splitReferenceCss && colorSchemeOutput.referenceCssBlock) {
+      referenceCssBlocks.push(colorSchemeOutput.referenceCssBlock);
     }
     colorSchemeCssBlocks.push(colorSchemeOutput.cssBlock);
     colorSchemeVariableNames.set(
@@ -115,6 +115,7 @@ for (const project of projects) {
   }
 
   assertColorSchemesExposeSameVariables(colorSchemeVariableNames);
+  const referenceCssBlock = mergeReferenceCssBlocks(referenceCssBlocks);
   if (splitReferenceCss && referenceCssBlock) {
     writeCssBlocks(outputDir, referenceCssFile, [referenceCssBlock]);
   }
@@ -133,4 +134,110 @@ for (const project of projects) {
     `${JSON.stringify(manifest, null, 2)}\n`,
   );
   console.log(`Built ${project.id} into ${project.outputDir}`);
+}
+
+function mergeReferenceCssBlocks(cssBlocks: string[]): string | null {
+  const declarationsByVariable = new Map<string, ReferenceCssDeclaration>();
+
+  for (const cssBlock of cssBlocks) {
+    const declarationBlock = cssBlock.match(/^[^{]+\{\n([\s\S]*)\n\}$/)?.[1];
+    if (!declarationBlock) continue;
+
+    for (const line of declarationBlock.split("\n")) {
+      const declaration = line.trim();
+      if (!declaration) continue;
+
+      const separatorIndex = declaration.indexOf(":");
+      if (separatorIndex <= 0) continue;
+
+      const variableName = declaration.slice(0, separatorIndex).trim();
+      const existingDeclaration = declarationsByVariable.get(variableName);
+      if (
+        existingDeclaration &&
+        existingDeclaration.declaration !== declaration
+      ) {
+        throw new Error(
+          `Reference CSS variable ${variableName} has conflicting values: ${existingDeclaration.declaration} and ${declaration}`,
+        );
+      }
+      declarationsByVariable.set(variableName, {
+        variableName,
+        declaration,
+        dependencies: getCssVariableDependencies(declaration),
+      });
+    }
+  }
+
+  if (declarationsByVariable.size === 0) return null;
+
+  const orderedDeclarations = orderReferenceCssDeclarations([
+    ...declarationsByVariable.values(),
+  ]);
+
+  return `:root {\n${orderedDeclarations
+    .map(({ declaration }) => `  ${declaration}`)
+    .join("\n")}\n}`;
+}
+
+interface ReferenceCssDeclaration {
+  variableName: string;
+  declaration: string;
+  dependencies: string[];
+}
+
+function getCssVariableDependencies(declaration: string): string[] {
+  const dependencies = new Set<string>();
+  const variableReferencePattern = /var\(\s*(--[^,\s)]+)/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = variableReferencePattern.exec(declaration))) {
+    dependencies.add(match[1]!);
+  }
+
+  return [...dependencies];
+}
+
+function orderReferenceCssDeclarations(
+  declarations: ReferenceCssDeclaration[],
+): ReferenceCssDeclaration[] {
+  const declarationsByVariable = new Map(
+    declarations.map((declaration) => [declaration.variableName, declaration]),
+  );
+  const orderedDeclarations: ReferenceCssDeclaration[] = [];
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+
+  function visit(declaration: ReferenceCssDeclaration, stack: string[]): void {
+    if (visited.has(declaration.variableName)) return;
+    if (visiting.has(declaration.variableName)) {
+      throw new Error(
+        `Reference CSS variables contain a cycle: ${[
+          ...stack,
+          declaration.variableName,
+        ].join(" -> ")}`,
+      );
+    }
+
+    visiting.add(declaration.variableName);
+
+    for (const dependency of declaration.dependencies) {
+      const dependencyDeclaration = declarationsByVariable.get(dependency);
+      if (!dependencyDeclaration) {
+        throw new Error(
+          `Reference CSS variable ${declaration.variableName} depends on missing ${dependency}`,
+        );
+      }
+      visit(dependencyDeclaration, [...stack, declaration.variableName]);
+    }
+
+    visiting.delete(declaration.variableName);
+    visited.add(declaration.variableName);
+    orderedDeclarations.push(declaration);
+  }
+
+  for (const declaration of declarations) {
+    visit(declaration, []);
+  }
+
+  return orderedDeclarations;
 }

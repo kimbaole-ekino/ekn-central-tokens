@@ -141,6 +141,18 @@ This is intentionally a low-risk integration:
   artifact build uses after sibling scheme-set expansion,
 - `source` sets stay in the reference/base context during scheme expansion;
   only enabled non-source sibling sets become generated scheme outputs,
+- a set marked `source` in any effective theme is treated as a reference root
+  for the full project build, even if another generated theme still has that
+  set as `enabled`,
+- active sets are processed as `source` sets first, then `enabled` sets, so the
+  build does not depend on object insertion order from generated token JSON,
+- generated `reference.css` merges source/reference declarations from every
+  effective theme so shared variables are not missed when themes use different
+  source sets,
+- `reference.css` declarations are dependency-ordered, so a variable such as
+  `--global-color-white` is emitted before declarations that use
+  `var(--global-color-white)`; missing or cyclic reference CSS dependencies
+  fail the build,
 - nested references inside composite token values, such as border or shadow
   color fields, are validated with the same context rules,
 - custom formats still own resolved token JSON and metadata JSON shape.

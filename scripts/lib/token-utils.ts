@@ -201,8 +201,8 @@ export function validateTokenDocument(
       );
     }
 
-    const selectedSets = Object.entries(selectedTokenSets ?? {})
-      .filter(([setName, state]) => {
+    const selectedSetEntries = Object.entries(selectedTokenSets ?? {}).filter(
+      ([setName, state]) => {
         if (!isTokenSetState(state)) {
           errors.push(
             `${String(theme.id ?? "unknown-theme")}.${setName}: invalid selectedTokenSets state ${String(state)}`,
@@ -210,11 +210,15 @@ export function validateTokenDocument(
           return false;
         }
         return state !== "disabled";
-      })
-      .map(([setName]) => setName);
-    const sourceSets = Object.entries(selectedTokenSets ?? {})
+      },
+    );
+    const sourceSets = selectedSetEntries
       .filter(([, state]) => state === "source")
       .map(([setName]) => setName);
+    const enabledSets = selectedSetEntries
+      .filter(([, state]) => state === "enabled")
+      .map(([setName]) => setName);
+    const selectedSets = [...sourceSets, ...enabledSets];
 
     if (selectedSets.length === 0) {
       errors.push(`${theme.id ?? "unknown-theme"}: no active token sets`);

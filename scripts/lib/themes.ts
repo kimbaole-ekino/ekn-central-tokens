@@ -17,13 +17,13 @@ export function getColorSchemeRootSegments(
 ): Set<string> {
   const themeCount = themes.length;
   const countBySet = new Map<string, number>();
+  const sourceRootSegments = getSourceRootSegments(themes);
 
   for (const theme of themes) {
-    const sourceSets = new Set(theme.sourceSets ?? []);
     for (const setName of new Set(
       theme.sets
-        .filter((set) => !sourceSets.has(set))
-        .map((set) => kebabSegment(set)),
+        .map((set) => kebabSegment(set))
+        .filter((segment) => !sourceRootSegments.has(segment)),
     )) {
       countBySet.set(setName, (countBySet.get(setName) ?? 0) + 1);
     }
@@ -41,18 +41,31 @@ export function getReferenceRootSegments(
   colorSchemeRootSegments: Set<string>,
 ): Set<string> {
   const rootSegments = new Set<string>();
+  const sourceRootSegments = getSourceRootSegments(themes);
 
   for (const theme of themes) {
-    const sourceSets = new Set(theme.sourceSets ?? []);
     for (const setName of theme.sets) {
       const segment = kebabSegment(setName);
-      if (sourceSets.has(setName) || !colorSchemeRootSegments.has(segment)) {
+      if (
+        sourceRootSegments.has(segment) ||
+        !colorSchemeRootSegments.has(segment)
+      ) {
         rootSegments.add(segment);
       }
     }
   }
 
   return rootSegments;
+}
+
+function getSourceRootSegments(
+  themes: Pick<BuildTheme, "sourceSets">[],
+): Set<string> {
+  return new Set(
+    themes.flatMap((theme) =>
+      (theme.sourceSets ?? []).map((setName) => kebabSegment(setName)),
+    ),
+  );
 }
 
 export function getThemesFromTokenDocument(
@@ -79,13 +92,13 @@ export function getThemesFromTokenDocument(
     const selectedTokenSets = isObject(theme.selectedTokenSets)
       ? theme.selectedTokenSets
       : {};
-    const activeSetEntries = Object.entries(selectedTokenSets).filter(
-      ([, state]) => state === "enabled" || state === "source",
-    );
-    const sets = activeSetEntries.map(([setName]) => setName);
-    const sourceSets = activeSetEntries
+    const sourceSets = Object.entries(selectedTokenSets)
       .filter(([, state]) => state === "source")
       .map(([setName]) => setName);
+    const enabledSets = Object.entries(selectedTokenSets)
+      .filter(([, state]) => state === "enabled")
+      .map(([setName]) => setName);
+    const sets = [...sourceSets, ...enabledSets];
 
     if (sets.length === 0) {
       throw new Error(
