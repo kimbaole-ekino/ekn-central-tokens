@@ -20,6 +20,7 @@ import type { BuildManifest, TokenDocument } from "./lib/types.js";
 import {
   assertColorSchemesExposeSameVariables,
   buildThemeWithStyleDictionary,
+  type CssVariableDeclaration,
   registerStyleDictionaryTransforms,
 } from "./lib/style-dictionary.js";
 import {
@@ -64,13 +65,14 @@ for (const project of projects) {
   resetOutputDir(rootDir, outputDir, project);
 
   const buildTime = new Date().toISOString();
+  const sourceCommit = getSourceCommit(rootDir);
   const aggregateCssFile = `css/${project.id}.tokens.css`;
   const referenceCssFile = `css/${project.id}.reference.css`;
   const manifest: BuildManifest = {
     project: project.id,
-    version: buildTime.replace(/[-:]/g, "").replace(/\..+$/, "Z"),
+    version: getArtifactVersion(sourceCommit),
     buildTime,
-    sourceCommit: getSourceCommit(rootDir),
+    sourceCommit,
     css: aggregateCssFile,
     themes: {},
     html: {},
@@ -81,7 +83,7 @@ for (const project of projects) {
 
   const colorSchemeCssBlocks: string[] = [];
   const colorSchemeVariableNames = new Map<string, string[]>();
-  const referenceCssBlocks: string[] = [];
+  const referenceCssDeclarations: CssVariableDeclaration[] = [];
 
   for (const theme of themes) {
     const artifactBase = `${project.id}.${theme.outputId}`;
@@ -104,8 +106,10 @@ for (const project of projects) {
       resolvedTokens: resolvedTokensFile,
       metadata: metadataFile,
     };
-    if (splitReferenceCss && colorSchemeOutput.referenceCssBlock) {
-      referenceCssBlocks.push(colorSchemeOutput.referenceCssBlock);
+    if (splitReferenceCss) {
+      referenceCssDeclarations.push(
+        ...colorSchemeOutput.referenceCssDeclarations,
+      );
     }
     colorSchemeCssBlocks.push(colorSchemeOutput.cssBlock);
     colorSchemeVariableNames.set(
@@ -115,7 +119,9 @@ for (const project of projects) {
   }
 
   assertColorSchemesExposeSameVariables(colorSchemeVariableNames);
-  const referenceCssBlock = mergeReferenceCssBlocks(referenceCssBlocks);
+  const referenceCssBlock = mergeReferenceCssDeclarations(
+    referenceCssDeclarations,
+  );
   if (splitReferenceCss && referenceCssBlock) {
     writeCssBlocks(outputDir, referenceCssFile, [referenceCssBlock]);
   }
@@ -136,36 +142,24 @@ for (const project of projects) {
   console.log(`Built ${project.id} into ${project.outputDir}`);
 }
 
-function mergeReferenceCssBlocks(cssBlocks: string[]): string | null {
-  const declarationsByVariable = new Map<string, ReferenceCssDeclaration>();
+function mergeReferenceCssDeclarations(
+  declarations: CssVariableDeclaration[],
+): string | null {
+  const declarationsByVariable = new Map<string, CssVariableDeclaration>();
 
-  for (const cssBlock of cssBlocks) {
-    const declarationBlock = cssBlock.match(/^[^{]+\{\n([\s\S]*)\n\}$/)?.[1];
-    if (!declarationBlock) continue;
-
-    for (const line of declarationBlock.split("\n")) {
-      const declaration = line.trim();
-      if (!declaration) continue;
-
-      const separatorIndex = declaration.indexOf(":");
-      if (separatorIndex <= 0) continue;
-
-      const variableName = declaration.slice(0, separatorIndex).trim();
-      const existingDeclaration = declarationsByVariable.get(variableName);
-      if (
-        existingDeclaration &&
-        existingDeclaration.declaration !== declaration
-      ) {
-        throw new Error(
-          `Reference CSS variable ${variableName} has conflicting values: ${existingDeclaration.declaration} and ${declaration}`,
-        );
-      }
-      declarationsByVariable.set(variableName, {
-        variableName,
-        declaration,
-        dependencies: getCssVariableDependencies(declaration),
-      });
+  for (const declaration of declarations) {
+    const existingDeclaration = declarationsByVariable.get(
+      declaration.variableName,
+    );
+    if (
+      existingDeclaration &&
+      existingDeclaration.declaration !== declaration.declaration
+    ) {
+      throw new Error(
+        `Reference CSS variable ${declaration.variableName} has conflicting values: ${existingDeclaration.declaration} and ${declaration.declaration}`,
+      );
     }
+    declarationsByVariable.set(declaration.variableName, declaration);
   }
 
   if (declarationsByVariable.size === 0) return null;
@@ -179,35 +173,17 @@ function mergeReferenceCssBlocks(cssBlocks: string[]): string | null {
     .join("\n")}\n}`;
 }
 
-interface ReferenceCssDeclaration {
-  variableName: string;
-  declaration: string;
-  dependencies: string[];
-}
-
-function getCssVariableDependencies(declaration: string): string[] {
-  const dependencies = new Set<string>();
-  const variableReferencePattern = /var\(\s*(--[^,\s)]+)/g;
-  let match: RegExpExecArray | null;
-
-  while ((match = variableReferencePattern.exec(declaration))) {
-    dependencies.add(match[1]!);
-  }
-
-  return [...dependencies];
-}
-
 function orderReferenceCssDeclarations(
-  declarations: ReferenceCssDeclaration[],
-): ReferenceCssDeclaration[] {
+  declarations: CssVariableDeclaration[],
+): CssVariableDeclaration[] {
   const declarationsByVariable = new Map(
     declarations.map((declaration) => [declaration.variableName, declaration]),
   );
-  const orderedDeclarations: ReferenceCssDeclaration[] = [];
+  const orderedDeclarations: CssVariableDeclaration[] = [];
   const visiting = new Set<string>();
   const visited = new Set<string>();
 
-  function visit(declaration: ReferenceCssDeclaration, stack: string[]): void {
+  function visit(declaration: CssVariableDeclaration, stack: string[]): void {
     if (visited.has(declaration.variableName)) return;
     if (visiting.has(declaration.variableName)) {
       throw new Error(
@@ -240,4 +216,8 @@ function orderReferenceCssDeclarations(
   }
 
   return orderedDeclarations;
+}
+
+function getArtifactVersion(sourceCommit: string): string {
+  return sourceCommit === "unknown" ? "unknown" : sourceCommit.slice(0, 12);
 }

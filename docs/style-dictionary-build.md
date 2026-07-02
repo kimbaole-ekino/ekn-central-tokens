@@ -100,6 +100,11 @@ The build currently:
 - derives theme builds from each theme's `selectedTokenSets`,
 - treats `source` and `enabled` token-set states as active for central builds
   while rejecting invalid states during validation,
+- requires each theme to include at least one `enabled` token set; source-only
+  themes are invalid because they cannot produce a semantic scheme output,
+- prefers explicit sibling mode metadata from
+  `$themes[].$extensions.ekinoTokenArchitect.modeSets` and only falls back to
+  automatic sibling-mode inference for older token documents,
 - flattens selected token sets by theme,
 - applies the Tokens Studio preprocessor and `tokens-studio` transform group,
 - uses Style Dictionary to resolve aliases,
@@ -141,11 +146,27 @@ This is intentionally a low-risk integration:
   artifact build uses after sibling scheme-set expansion,
 - `source` sets stay in the reference/base context during scheme expansion;
   only enabled non-source sibling sets become generated scheme outputs,
+- explicit mode metadata is stored on a theme under
+  `$extensions.ekinoTokenArchitect.modeSets`. Each entry must be selected as
+  `enabled` in the same theme:
+
+  ```json
+  {
+    "$extensions": {
+      "ekinoTokenArchitect": {
+        "modeSets": ["health-black", "health-white"]
+      }
+    }
+  }
+  ```
+
 - a set marked `source` in any effective theme is treated as a reference root
   for the full project build, even if another generated theme still has that
   set as `enabled`,
 - active sets are processed as `source` sets first, then `enabled` sets, so the
   build does not depend on object insertion order from generated token JSON,
+- generated `reference.css` is built from Style Dictionary token/dictionary
+  declarations rather than by parsing a generated CSS file,
 - generated `reference.css` merges source/reference declarations from every
   effective theme so shared variables are not missed when themes use different
   source sets,
@@ -263,3 +284,12 @@ scheme-prefixed names such as `--brand-a-primary-color` or
 After normalization, every color scheme must expose the same CSS variable names.
 If one scheme is missing a variable or emits an extra variable, the build fails
 before writing the aggregate CSS contract.
+
+## Versioning
+
+`manifest.version` is deterministic. When the repository commit is available,
+the build uses the short source commit SHA so rebuilding the same commit does
+not produce a different artifact version or target delivery branch name.
+
+`manifest.buildTime` remains an audit timestamp for the build run. Consumers
+that need stable artifact identity should use `manifest.version`.

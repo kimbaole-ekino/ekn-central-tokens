@@ -29,6 +29,9 @@ export function getColorSchemeRootSegments(
     }
   }
 
+  // A non-source set that appears in fewer than all generated effective themes
+  // is a scheme root. Sets present in every effective theme are shared reference
+  // roots, so their root segment stays in generated CSS variable names.
   return new Set(
     [...countBySet.entries()]
       .filter(([, count]) => count < themeCount)
@@ -100,11 +103,18 @@ export function getThemesFromTokenDocument(
       .map(([setName]) => setName);
     const sets = [...sourceSets, ...enabledSets];
 
+    if (enabledSets.length === 0) {
+      throw new Error(
+        `${project.tokenFile} theme ${theme.id} must include at least one enabled token set.`,
+      );
+    }
+
     if (sets.length === 0) {
       throw new Error(
         `${project.tokenFile} theme ${theme.id} has no active token sets.`,
       );
     }
+    const modeSets = getExplicitModeSets(theme, enabledSets);
 
     themes.push(
       ...expandThemeModeSets(
@@ -116,6 +126,7 @@ export function getThemesFromTokenDocument(
               : theme.id,
           sets,
           sourceSets,
+          modeSets,
         },
         tokens,
       ),
@@ -167,4 +178,31 @@ export function themeOutputSegment(projectId: string, themeId: string): string {
   return themeSegment.startsWith(`${projectSegment}-`)
     ? themeSegment.slice(projectSegment.length + 1)
     : themeSegment;
+}
+
+function getExplicitModeSets(
+  theme: Record<string, unknown>,
+  enabledSets: string[],
+): string[] | undefined {
+  const extension = theme.$extensions;
+  if (!isObject(extension)) return undefined;
+  const architect = extension.ekinoTokenArchitect;
+  if (!isObject(architect)) return undefined;
+  const modeSets = architect.modeSets;
+  if (modeSets === undefined) return undefined;
+  if (!Array.isArray(modeSets)) {
+    throw new Error(
+      `Theme ${String(theme.id ?? "unknown-theme")} has invalid $extensions.ekinoTokenArchitect.modeSets; expected an array of enabled token set names.`,
+    );
+  }
+
+  const enabledSetNames = new Set(enabledSets);
+  return modeSets.map((setName) => {
+    if (typeof setName !== "string" || !enabledSetNames.has(setName)) {
+      throw new Error(
+        `Theme ${String(theme.id ?? "unknown-theme")} has mode set ${String(setName)} that is not selected as enabled.`,
+      );
+    }
+    return setName;
+  });
 }

@@ -1,7 +1,12 @@
 import path from "node:path";
 import StyleDictionary from "style-dictionary";
 import { propertyFormatNames } from "style-dictionary/enums";
-import { formattedVariables } from "style-dictionary/utils";
+import {
+  createPropertyFormatter,
+  formattedVariables,
+  getReferences,
+  usesReferences,
+} from "style-dictionary/utils";
 import { register as registerTokensStudioTransforms } from "@tokens-studio/sd-transforms";
 import type { TokenDocument, TokenLeaf } from "./types.js";
 import { compactObject } from "./token-utils.js";
@@ -20,6 +25,7 @@ interface DictionaryToken extends TokenLeaf {
 interface DictionaryLike {
   allTokens?: DictionaryToken[];
   tokens?: unknown;
+  unfilteredTokens?: unknown;
 }
 
 interface BuildThemeOptions {
@@ -35,8 +41,14 @@ interface BuildThemeOptions {
 
 export interface BuildThemeOutput {
   cssBlock: string;
-  referenceCssBlock: string | null;
+  referenceCssDeclarations: CssVariableDeclaration[];
   variableNames: string[];
+}
+
+export interface CssVariableDeclaration {
+  variableName: string;
+  declaration: string;
+  dependencies: string[];
 }
 
 let tokensStudioTransformsRegistered = false;
@@ -174,21 +186,20 @@ export async function buildThemeWithStyleDictionary({
     cssLayer: "semantic",
     splitReferenceCss,
   });
-  const referenceCssBlock = splitReferenceCss
-    ? formatCssVariablesBlock({
+  const referenceCssDeclarations = splitReferenceCss
+    ? formatCssVariableDeclarations({
         dictionary: cssDictionary,
-        selector: ":root",
         outputReferences: true,
         themeId,
         colorSchemeRootSegments,
         cssLayer: "reference",
         splitReferenceCss,
       })
-    : null;
+    : [];
 
   return {
     cssBlock,
-    referenceCssBlock,
+    referenceCssDeclarations,
     variableNames: getCssVariableNames(
       cssDictionary,
       "semantic",
@@ -266,6 +277,66 @@ function formatCssVariablesBlock({
   });
 
   return `${selector} {\n${variables}\n}`;
+}
+
+function formatCssVariableDeclarations({
+  dictionary,
+  outputReferences,
+  themeId,
+  colorSchemeRootSegments,
+  cssLayer = "all",
+  splitReferenceCss = false,
+}: {
+  dictionary: DictionaryLike;
+  outputReferences: boolean;
+  themeId: string;
+  colorSchemeRootSegments: Set<string>;
+  cssLayer?: CssLayer;
+  splitReferenceCss?: boolean;
+}): CssVariableDeclaration[] {
+  normalizeCssDictionaryNames(dictionary, themeId, colorSchemeRootSegments);
+  const allTokens = dictionary.allTokens ?? [];
+  const outputTokens = allTokens.filter((token) =>
+    shouldIncludeCssToken(
+      token,
+      cssLayer,
+      splitReferenceCss,
+      colorSchemeRootSegments,
+    ),
+  );
+  assertUniqueCssTokenNames(outputTokens, themeId);
+  const outputDictionary = {
+    ...dictionary,
+    allTokens: outputTokens,
+  };
+  const formatProperty = createPropertyFormatter({
+    outputReferences,
+    dictionary: outputDictionary as never,
+    format: propertyFormatNames.css,
+    formatting: {
+      indentation: "",
+    },
+  });
+
+  return outputTokens.flatMap((token) => {
+    if (typeof token.name !== "string" || !token.name) return [];
+    const declaration = formatProperty(token as never).trim();
+    if (!declaration) return [];
+
+    return [
+      {
+        variableName: `--${token.name}`,
+        declaration,
+        dependencies: getCssVariableDependenciesFromToken(
+          token,
+          dictionary,
+          themeId,
+          colorSchemeRootSegments,
+          outputReferences,
+        ),
+      },
+    ];
+  });
 }
 
 function shouldIncludeCssToken(
@@ -410,6 +481,45 @@ function getCssVariableNames(
       (name): name is string => typeof name === "string" && name.length > 0,
     )
     .sort((left, right) => left.localeCompare(right));
+}
+
+function getCssVariableDependenciesFromToken(
+  token: DictionaryToken,
+  dictionary: DictionaryLike,
+  themeId: string,
+  colorSchemeRootSegments: Set<string>,
+  outputReferences: boolean,
+): string[] {
+  if (!outputReferences) return [];
+  const originalValue = tokenOriginalValue(token);
+  if (!usesReferences(originalValue)) return [];
+
+  const references = getReferences(
+    originalValue as never,
+    dictionary.tokens as never,
+    {
+      unfilteredTokens: dictionary.unfilteredTokens,
+      warnImmediately: false,
+    } as never,
+  ) as DictionaryToken[];
+
+  return [
+    ...new Set(
+      references
+        .map((reference) => {
+          const name =
+            typeof reference.name === "string" && reference.name
+              ? reference.name
+              : semanticCssTokenName(
+                  reference,
+                  themeId,
+                  colorSchemeRootSegments,
+                );
+          return name ? `--${name}` : "";
+        })
+        .filter(Boolean),
+    ),
+  ];
 }
 
 function colorSchemeSelector(schemeId: string): string {

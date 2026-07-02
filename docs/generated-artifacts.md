@@ -304,9 +304,9 @@ Recommended shape:
 ```json
 {
   "project": "project-a",
-  "version": "20260626T090000Z",
+  "version": "abc1234def56",
   "buildTime": "2026-06-26T09:00:00Z",
-  "sourceCommit": "abc1234",
+  "sourceCommit": "abc1234def56",
   "css": "css/project-a.tokens.css",
   "referenceCss": "css/project-a.reference.css",
   "themes": {

@@ -220,6 +220,12 @@ export function validateTokenDocument(
       .map(([setName]) => setName);
     const selectedSets = [...sourceSets, ...enabledSets];
 
+    if (enabledSets.length === 0) {
+      errors.push(
+        `${theme.id ?? "unknown-theme"}: must include at least one enabled token set`,
+      );
+    }
+
     if (selectedSets.length === 0) {
       errors.push(`${theme.id ?? "unknown-theme"}: no active token sets`);
     }
@@ -238,7 +244,13 @@ export function validateTokenDocument(
         ? theme.name
         : themeId;
     const effectiveThemes = expandEffectiveThemeSetGroups(
-      { id: themeId, name: themeName, sets: selectedSets, sourceSets },
+      {
+        id: themeId,
+        name: themeName,
+        sets: selectedSets,
+        sourceSets,
+        modeSets: getExplicitModeSetsForValidation(theme, enabledSets, errors),
+      },
       document,
     );
 
@@ -276,6 +288,7 @@ export interface EffectiveThemeSetGroup {
   name: string;
   sets: string[];
   sourceSets?: string[];
+  modeSets?: string[];
 }
 
 export function expandEffectiveThemeSetGroups(
@@ -286,10 +299,18 @@ export function expandEffectiveThemeSetGroups(
   const modeCandidateSets = theme.sets.filter(
     (setName) => !sourceSetNames.has(setName),
   );
-  const modeSets = getThemeModeSets(
-    { name: theme.name, sets: modeCandidateSets },
-    tokens,
-  );
+  const modeSets =
+    theme.modeSets ??
+    getThemeModeSets({ name: theme.name, sets: modeCandidateSets }, tokens);
+  if (
+    theme.modeSets === undefined &&
+    modeCandidateSets.length > 1 &&
+    modeSets.length <= 1
+  ) {
+    console.warn(
+      `Theme ${theme.name} has multiple enabled token sets but no explicit modeSets metadata and automatic mode expansion did not find sibling modes.`,
+    );
+  }
   if (modeSets.length <= 1) return [theme];
 
   const modeSetNames = new Set(modeSets);
@@ -364,6 +385,43 @@ function kebabSegmentForExpansion(value: unknown): string {
     .replace(/[^a-zA-Z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .toLowerCase();
+}
+
+function getExplicitModeSetsForValidation(
+  theme: TokensStudioTheme,
+  enabledSets: string[],
+  errors: string[],
+): string[] | undefined {
+  const extension = isObject(theme.$extensions) ? theme.$extensions : null;
+  const architect = isObject(extension?.ekinoTokenArchitect)
+    ? extension.ekinoTokenArchitect
+    : null;
+  const modeSets = architect?.modeSets;
+  if (modeSets === undefined) return undefined;
+
+  const themeId = String(theme.id ?? "unknown-theme");
+  if (!Array.isArray(modeSets)) {
+    errors.push(
+      `${themeId}: $extensions.ekinoTokenArchitect.modeSets must be an array`,
+    );
+    return undefined;
+  }
+
+  const enabledSetNames = new Set(enabledSets);
+  const validModeSets: string[] = [];
+  for (const setName of modeSets) {
+    if (typeof setName !== "string") {
+      errors.push(`${themeId}: modeSets entries must be strings`);
+      continue;
+    }
+    if (!enabledSetNames.has(setName)) {
+      errors.push(`${themeId}: mode set ${setName} is not enabled`);
+      continue;
+    }
+    validModeSets.push(setName);
+  }
+
+  return validModeSets;
 }
 
 export function renderTemplate(

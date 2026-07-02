@@ -173,4 +173,3 @@ Skipping target delivery for {project-id}: token-definitions/projects/{project-i
 - Inject real baseline/latest token file SHAs into the workflow.
 - Add block example schema validation.
 - Add artifact snapshot checks.
-- Add deterministic versioning from commit SHA.

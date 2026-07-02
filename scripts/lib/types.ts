@@ -28,6 +28,12 @@ export interface TokensStudioTheme {
   id?: unknown;
   name?: unknown;
   selectedTokenSets?: Record<string, unknown>;
+  $extensions?: {
+    ekinoTokenArchitect?: {
+      modeSets?: unknown;
+    };
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 }
 
@@ -70,6 +76,7 @@ export interface BuildTheme {
   name: string;
   sets: string[];
   sourceSets?: string[];
+  modeSets?: string[];
   outputId: string;
 }
 
