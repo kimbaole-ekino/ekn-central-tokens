@@ -69,6 +69,7 @@ export interface BuildTheme {
   id: string;
   name: string;
   sets: string[];
+  sourceSets?: string[];
   outputId: string;
 }
 

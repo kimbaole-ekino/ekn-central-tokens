@@ -55,6 +55,11 @@ docs/
 
 - `token-definitions/projects/{project-id}/tokens.json` is plugin-submitted token
   source. It includes token sets, values, `$themes`, and `$metadata`.
+- `$themes[].selectedTokenSets` accepts `source`, `enabled`, and `disabled`.
+  Central build treats `source` and `enabled` as active sets, expands sibling
+  enabled scheme sets into effective themes, keeps `source` sets as reference
+  context, validates set-qualified aliases inside each effective theme context,
+  and rejects missing-set, inactive-context, or cyclic aliases.
 - `projects.config.json` defines which projects are built.
 - `blocks/` contains static HTML block contracts and examples.
 - `scripts/build-token-artifacts.ts` orchestrates Style Dictionary token

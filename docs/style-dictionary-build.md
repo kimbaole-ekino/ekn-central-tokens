@@ -98,6 +98,8 @@ The build currently:
 - supports affected-project build filtering,
 - requires `tokens.json.$themes`,
 - derives theme builds from each theme's `selectedTokenSets`,
+- treats `source` and `enabled` token-set states as active for central builds
+  while rejecting invalid states during validation,
 - flattens selected token sets by theme,
 - applies the Tokens Studio preprocessor and `tokens-studio` transform group,
 - uses Style Dictionary to resolve aliases,
@@ -130,6 +132,17 @@ This is intentionally a low-risk integration:
 - the dependency version is compatible with Style Dictionary 4,
 - token document validation remains in `scripts/lib/token-utils.ts`,
 - project/theme selection still comes from `$themes[].selectedTokenSets`,
+- `selectedTokenSets` state values must be `source`, `enabled`, or `disabled`,
+- aliases must be set-qualified, such as `{global.color.brand}`, so the
+  reference origin is explicit,
+- local Tokens Studio aliases without a set name, such as `{color.brand}`, are
+  rejected because they are ambiguous when multiple sets are active,
+- alias validation runs against the same effective theme set groups that the
+  artifact build uses after sibling scheme-set expansion,
+- `source` sets stay in the reference/base context during scheme expansion;
+  only enabled non-source sibling sets become generated scheme outputs,
+- nested references inside composite token values, such as border or shadow
+  color fields, are validated with the same context rules,
 - custom formats still own resolved token JSON and metadata JSON shape.
 
 ## Style Dictionary Structure

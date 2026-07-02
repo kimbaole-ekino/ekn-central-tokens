@@ -9,9 +9,9 @@ target PR/MR delivery details are documented in `target-project-delivery.md`.
 
 ## Workflows
 
-| Workflow | Trigger | Purpose |
-| --- | --- | --- |
-| `.github/workflows/token-ci.yml` | Pull request, manual dispatch | Validate token sources and build artifacts. |
+| Workflow                                | Trigger                         | Purpose                                                     |
+| --------------------------------------- | ------------------------------- | ----------------------------------------------------------- |
+| `.github/workflows/token-ci.yml`        | Pull request, manual dispatch   | Validate token sources and build artifacts.                 |
 | `.github/workflows/target-delivery.yml` | Push to `main`, manual dispatch | Build affected artifacts and create target project PRs/MRs. |
 
 Both workflows run `npm ci` before repository scripts so CI uses the locked
@@ -143,7 +143,8 @@ CI should block merge on:
 - missing token `type` or `value`,
 - invalid path segments,
 - duplicate stable token IDs,
-- unresolved or cyclic aliases,
+- invalid `$themes[].selectedTokenSets` state values,
+- unresolved, inactive-context, or cyclic aliases,
 - failed artifact build,
 - stale baseline mismatch when SHA inputs are present.
 
