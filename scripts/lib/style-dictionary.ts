@@ -78,14 +78,17 @@ export async function buildThemeWithStyleDictionary({
         "ekn/resolved-tokens-json": ({ dictionary }) => {
           const resolvedTokens = Object.fromEntries(
             (dictionary.allTokens as DictionaryToken[])
-              .map((token) => [
-                token.path?.join(".") ?? token.name ?? "",
-                compactObject({
-                  type: tokenType(token),
-                  value: tokenValue(token),
-                  description: tokenDescription(token),
-                }),
-              ] as const)
+              .map(
+                (token) =>
+                  [
+                    token.path?.join(".") ?? token.name ?? "",
+                    compactObject({
+                      type: tokenType(token),
+                      value: tokenValue(token),
+                      description: tokenDescription(token),
+                    }),
+                  ] as const,
+              )
               .sort(([left], [right]) => left.localeCompare(right)),
           );
           return `${JSON.stringify(resolvedTokens, null, 2)}\n`;
@@ -93,19 +96,22 @@ export async function buildThemeWithStyleDictionary({
         "ekn/metadata-json": ({ dictionary }) => {
           const metadata = Object.fromEntries(
             (dictionary.allTokens as DictionaryToken[])
-              .map((token) => [
-                token.path?.join(".") ?? token.name ?? "",
-                {
-                  value: tokenValue(token),
-                  originalValue: tokenOriginalValue(token),
-                  cssVariable: `--${semanticCssTokenName(
-                    token,
-                    themeId,
-                    colorSchemeRootSegments,
-                  )}`,
-                  theme: themeId,
-                },
-              ] as const)
+              .map(
+                (token) =>
+                  [
+                    token.path?.join(".") ?? token.name ?? "",
+                    {
+                      value: tokenValue(token),
+                      originalValue: tokenOriginalValue(token),
+                      cssVariable: `--${semanticCssTokenName(
+                        token,
+                        themeId,
+                        colorSchemeRootSegments,
+                      )}`,
+                      theme: themeId,
+                    },
+                  ] as const,
+              )
               .sort(([left], [right]) => left.localeCompare(right)),
           );
           return `${JSON.stringify(metadata, null, 2)}\n`;
@@ -350,11 +356,7 @@ function normalizeCssTokenName(
   colorSchemeRootSegments: Set<string>,
   normalizedTokens: Set<DictionaryToken>,
 ): void {
-  if (
-    !token ||
-    normalizedTokens.has(token) ||
-    typeof token.name !== "string"
-  ) {
+  if (!token || normalizedTokens.has(token) || typeof token.name !== "string") {
     return;
   }
   normalizedTokens.add(token);
@@ -404,7 +406,9 @@ function getCssVariableNames(
       ),
     )
     .map((token) => token.name)
-    .filter((name): name is string => typeof name === "string" && name.length > 0)
+    .filter(
+      (name): name is string => typeof name === "string" && name.length > 0,
+    )
     .sort((left, right) => left.localeCompare(right));
 }
 

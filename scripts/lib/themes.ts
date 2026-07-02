@@ -1,5 +1,5 @@
 import type { BuildTheme, TokenDocument, TokenProject } from "./types.js";
-import { isObject, isTokenLeaf } from "./token-utils.js";
+import { expandEffectiveThemeSetGroups, isObject } from "./token-utils.js";
 
 export function selectThemeTokens(
   tokens: TokenDocument,
@@ -13,13 +13,18 @@ export function selectThemeTokens(
 }
 
 export function getColorSchemeRootSegments(
-  themes: Pick<BuildTheme, "sets">[],
+  themes: Pick<BuildTheme, "sets" | "sourceSets">[],
 ): Set<string> {
   const themeCount = themes.length;
   const countBySet = new Map<string, number>();
 
   for (const theme of themes) {
-    for (const setName of new Set(theme.sets.map((set) => kebabSegment(set)))) {
+    const sourceSets = new Set(theme.sourceSets ?? []);
+    for (const setName of new Set(
+      theme.sets
+        .filter((set) => !sourceSets.has(set))
+        .map((set) => kebabSegment(set)),
+    )) {
       countBySet.set(setName, (countBySet.get(setName) ?? 0) + 1);
     }
   }
@@ -32,15 +37,16 @@ export function getColorSchemeRootSegments(
 }
 
 export function getReferenceRootSegments(
-  themes: Pick<BuildTheme, "sets">[],
+  themes: Pick<BuildTheme, "sets" | "sourceSets">[],
   colorSchemeRootSegments: Set<string>,
 ): Set<string> {
   const rootSegments = new Set<string>();
 
   for (const theme of themes) {
+    const sourceSets = new Set(theme.sourceSets ?? []);
     for (const setName of theme.sets) {
       const segment = kebabSegment(setName);
-      if (!colorSchemeRootSegments.has(segment)) {
+      if (sourceSets.has(setName) || !colorSchemeRootSegments.has(segment)) {
         rootSegments.add(segment);
       }
     }
@@ -73,13 +79,17 @@ export function getThemesFromTokenDocument(
     const selectedTokenSets = isObject(theme.selectedTokenSets)
       ? theme.selectedTokenSets
       : {};
-    const sets = Object.entries(selectedTokenSets)
-      .filter(([, state]) => state !== "disabled")
+    const activeSetEntries = Object.entries(selectedTokenSets).filter(
+      ([, state]) => state === "enabled" || state === "source",
+    );
+    const sets = activeSetEntries.map(([setName]) => setName);
+    const sourceSets = activeSetEntries
+      .filter(([, state]) => state === "source")
       .map(([setName]) => setName);
 
     if (sets.length === 0) {
       throw new Error(
-        `${project.tokenFile} theme ${theme.id} has no enabled token sets.`,
+        `${project.tokenFile} theme ${theme.id} has no active token sets.`,
       );
     }
 
@@ -92,6 +102,7 @@ export function getThemesFromTokenDocument(
               ? theme.name
               : theme.id,
           sets,
+          sourceSets,
         },
         tokens,
       ),
@@ -126,17 +137,7 @@ export function expandThemeModeSets(
   theme: Omit<BuildTheme, "outputId">,
   tokens: TokenDocument,
 ): Omit<BuildTheme, "outputId">[] {
-  const modeSets = getThemeModeSets(theme, tokens);
-  if (modeSets.length <= 1) return [theme];
-
-  const modeSetNames = new Set(modeSets);
-  const baseSets = theme.sets.filter((setName) => !modeSetNames.has(setName));
-
-  return modeSets.map((setName) => ({
-    id: `${theme.id}:${setName}`,
-    name: setName,
-    sets: [...baseSets, setName],
-  }));
+  return expandEffectiveThemeSetGroups(theme, tokens);
 }
 
 export function kebabSegment(value: unknown): string {
@@ -153,60 +154,4 @@ export function themeOutputSegment(projectId: string, themeId: string): string {
   return themeSegment.startsWith(`${projectSegment}-`)
     ? themeSegment.slice(projectSegment.length + 1)
     : themeSegment;
-}
-
-function getThemeModeSets(
-  theme: Pick<BuildTheme, "name" | "sets">,
-  tokens: TokenDocument,
-): string[] {
-  const duplicateSets = new Set<string>();
-  const ownersByLocalPath = new Map<string, string[]>();
-  const themePrefix = kebabSegment(theme.name);
-
-  for (const setName of theme.sets) {
-    const set = tokens[setName];
-    if (!isObject(set)) continue;
-
-    for (const localPath of getTokenLocalPaths(set)) {
-      const owners = ownersByLocalPath.get(localPath) ?? [];
-      owners.push(setName);
-      ownersByLocalPath.set(localPath, owners);
-    }
-  }
-
-  for (const owners of ownersByLocalPath.values()) {
-    if (owners.length <= 1) continue;
-    for (const setName of owners) {
-      duplicateSets.add(setName);
-    }
-  }
-
-  const modeSets = theme.sets.filter((setName) => {
-    const segment = kebabSegment(setName);
-    return (
-      duplicateSets.has(setName) &&
-      (segment === themePrefix || segment.startsWith(`${themePrefix}-`))
-    );
-  });
-
-  return modeSets.length === duplicateSets.size ? modeSets : [];
-}
-
-function getTokenLocalPaths(node: unknown): string[] {
-  const paths: string[] = [];
-
-  function walk(value: unknown, prefix: string): void {
-    if (isTokenLeaf(value)) {
-      paths.push(prefix);
-      return;
-    }
-    if (!isObject(value)) return;
-
-    for (const [key, child] of Object.entries(value)) {
-      walk(child, prefix ? `${prefix}.${key}` : key);
-    }
-  }
-
-  walk(node, "");
-  return paths;
 }

@@ -100,18 +100,34 @@ export function resolveAlias(
   tokens: Map<string, TokenLeaf>,
   chain: string[] = [],
 ): unknown {
-  if (typeof value !== "string") return value;
-  const match = value.match(/^\{([^{}]+)\}$/);
-  if (!match) return value;
-  const aliasPath = match[1]!;
-  if (chain.includes(aliasPath)) {
-    throw new Error(`Cyclic alias: ${[...chain, aliasPath].join(" -> ")}`);
+  if (typeof value === "string") {
+    const match = value.match(/^\{([^{}]+)\}$/);
+    if (!match) return value;
+    const aliasPath = match[1]!;
+    if (chain.includes(aliasPath)) {
+      throw new Error(`Cyclic alias: ${[...chain, aliasPath].join(" -> ")}`);
+    }
+    const target = tokens.get(aliasPath);
+    if (!target) {
+      throw new Error(`Unresolved alias: ${aliasPath}`);
+    }
+    return resolveAlias(getLeafValue(target), tokens, [...chain, aliasPath]);
   }
-  const target = tokens.get(aliasPath);
-  if (!target) {
-    throw new Error(`Unresolved alias: ${aliasPath}`);
+
+  if (Array.isArray(value)) {
+    return value.map((item) => resolveAlias(item, tokens, chain));
   }
-  return resolveAlias(getLeafValue(target), tokens, [...chain, aliasPath]);
+
+  if (isObject(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, child]) => [
+        key,
+        resolveAlias(child, tokens, chain),
+      ]),
+    );
+  }
+
+  return value;
 }
 
 export function validateTokenDocument(
@@ -175,12 +191,33 @@ export function validateTokenDocument(
     if (!theme.id || typeof theme.id !== "string") {
       errors.push("root.$themes: theme is missing string id");
     }
-    const selectedSets = Object.entries(theme.selectedTokenSets ?? {})
-      .filter(([, state]) => state !== "disabled")
+    const selectedTokenSets = isObject(theme.selectedTokenSets)
+      ? theme.selectedTokenSets
+      : null;
+
+    if (!selectedTokenSets) {
+      errors.push(
+        `${String(theme.id ?? "unknown-theme")}: selectedTokenSets must be an object`,
+      );
+    }
+
+    const selectedSets = Object.entries(selectedTokenSets ?? {})
+      .filter(([setName, state]) => {
+        if (!isTokenSetState(state)) {
+          errors.push(
+            `${String(theme.id ?? "unknown-theme")}.${setName}: invalid selectedTokenSets state ${String(state)}`,
+          );
+          return false;
+        }
+        return state !== "disabled";
+      })
+      .map(([setName]) => setName);
+    const sourceSets = Object.entries(selectedTokenSets ?? {})
+      .filter(([, state]) => state === "source")
       .map(([setName]) => setName);
 
     if (selectedSets.length === 0) {
-      errors.push(`${theme.id ?? "unknown-theme"}: no enabled token sets`);
+      errors.push(`${theme.id ?? "unknown-theme"}: no active token sets`);
     }
 
     for (const setName of selectedSets) {
@@ -191,18 +228,30 @@ export function validateTokenDocument(
       }
     }
 
-    const flattened = flattenTokens(document, selectedSets);
-    for (const [tokenPath, leaf] of flattened) {
-      try {
-        resolveAlias(getLeafValue(leaf), flattened);
-      } catch (error) {
-        errors.push(
-          `${String(theme.id)}:${tokenPath}: ${formatAliasError(
-            error,
-            allTokens,
-            selectedSets,
-          )}`,
-        );
+    const themeId = String(theme.id ?? "unknown-theme");
+    const themeName =
+      typeof theme.name === "string" && theme.name.trim()
+        ? theme.name
+        : themeId;
+    const effectiveThemes = expandEffectiveThemeSetGroups(
+      { id: themeId, name: themeName, sets: selectedSets, sourceSets },
+      document,
+    );
+
+    for (const effectiveTheme of effectiveThemes) {
+      const flattened = flattenTokens(document, effectiveTheme.sets);
+      for (const [tokenPath, leaf] of flattened) {
+        try {
+          resolveAlias(getLeafValue(leaf), flattened);
+        } catch (error) {
+          errors.push(
+            `${effectiveTheme.id}:${tokenPath}: ${formatAliasError(
+              error,
+              allTokens,
+              effectiveTheme.sets,
+            )}`,
+          );
+        }
       }
     }
   }
@@ -210,6 +259,107 @@ export function validateTokenDocument(
   if (errors.length > 0) {
     throw new Error(`${sourceName} failed validation:\n${errors.join("\n")}`);
   }
+}
+
+function isTokenSetState(
+  value: unknown,
+): value is "enabled" | "disabled" | "source" {
+  return value === "enabled" || value === "disabled" || value === "source";
+}
+
+export interface EffectiveThemeSetGroup {
+  id: string;
+  name: string;
+  sets: string[];
+  sourceSets?: string[];
+}
+
+export function expandEffectiveThemeSetGroups(
+  theme: EffectiveThemeSetGroup,
+  tokens: TokenDocument,
+): EffectiveThemeSetGroup[] {
+  const sourceSetNames = new Set(theme.sourceSets ?? []);
+  const modeCandidateSets = theme.sets.filter(
+    (setName) => !sourceSetNames.has(setName),
+  );
+  const modeSets = getThemeModeSets(
+    { name: theme.name, sets: modeCandidateSets },
+    tokens,
+  );
+  if (modeSets.length <= 1) return [theme];
+
+  const modeSetNames = new Set(modeSets);
+  const baseSets = theme.sets.filter((setName) => !modeSetNames.has(setName));
+
+  return modeSets.map((setName) => ({
+    id: `${theme.id}:${setName}`,
+    name: setName,
+    sets: [...baseSets, setName],
+    sourceSets: theme.sourceSets,
+  }));
+}
+
+function getThemeModeSets(
+  theme: Pick<EffectiveThemeSetGroup, "name" | "sets">,
+  tokens: TokenDocument,
+): string[] {
+  const duplicateSets = new Set<string>();
+  const ownersByLocalPath = new Map<string, string[]>();
+  const themePrefix = kebabSegmentForExpansion(theme.name);
+
+  for (const setName of theme.sets) {
+    const set = tokens[setName];
+    if (!isObject(set)) continue;
+
+    for (const localPath of getTokenLocalPaths(set)) {
+      const owners = ownersByLocalPath.get(localPath) ?? [];
+      owners.push(setName);
+      ownersByLocalPath.set(localPath, owners);
+    }
+  }
+
+  for (const owners of ownersByLocalPath.values()) {
+    if (owners.length <= 1) continue;
+    for (const setName of owners) {
+      duplicateSets.add(setName);
+    }
+  }
+
+  const modeSets = theme.sets.filter((setName) => {
+    const segment = kebabSegmentForExpansion(setName);
+    return (
+      duplicateSets.has(setName) &&
+      (segment === themePrefix || segment.startsWith(`${themePrefix}-`))
+    );
+  });
+
+  return modeSets.length === duplicateSets.size ? modeSets : [];
+}
+
+function getTokenLocalPaths(node: unknown): string[] {
+  const paths: string[] = [];
+
+  function walk(value: unknown, prefix: string): void {
+    if (isTokenLeaf(value)) {
+      paths.push(prefix);
+      return;
+    }
+    if (!isObject(value)) return;
+
+    for (const [key, child] of Object.entries(value)) {
+      walk(child, prefix ? `${prefix}.${key}` : key);
+    }
+  }
+
+  walk(node, "");
+  return paths;
+}
+
+function kebabSegmentForExpansion(value: unknown): string {
+  return String(value)
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
 }
 
 export function renderTemplate(
