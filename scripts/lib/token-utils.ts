@@ -10,6 +10,8 @@ import type {
   TokenTheme,
 } from "./types.js";
 
+const TOKEN_LEAF_KEYS = new Set(["value", "type", "description"]);
+
 export function readJson<T = unknown>(filePath: string): T {
   return JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
 }
@@ -139,6 +141,15 @@ export function validateTokenDocument(
 
   function validateNode(node: unknown, currentPath: string): void {
     if (isTokenLeaf(node)) {
+      const unsupportedKeys = Object.keys(node).filter(
+        (key) => !TOKEN_LEAF_KEYS.has(key) && !key.startsWith("$"),
+      );
+      if (unsupportedKeys.length > 0) {
+        errors.push(
+          `${currentPath}: unsupported token properties ${unsupportedKeys.join(", ")}`,
+        );
+        return;
+      }
       const value = getLeafValue(node);
       const type = getLeafType(node);
       if (!type) errors.push(`${currentPath}: missing type`);
