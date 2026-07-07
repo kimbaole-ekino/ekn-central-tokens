@@ -7,7 +7,7 @@ import type {
   TokenDocument,
   TokenLeaf,
   TokenNode,
-  TokensStudioTheme,
+  TokenTheme,
 } from "./types.js";
 
 export function readJson<T = unknown>(filePath: string): T {
@@ -382,7 +382,7 @@ function kebabSegmentForExpansion(value: unknown): string {
 }
 
 function getExplicitModeSetsForValidation(
-  theme: TokensStudioTheme,
+  theme: TokenTheme,
   enabledSets: string[],
   errors: string[],
 ): string[] | undefined {
@@ -449,9 +449,9 @@ export function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-export function getThemeEntries(document: TokenDocument): TokensStudioTheme[] {
+export function getThemeEntries(document: TokenDocument): TokenTheme[] {
   return Array.isArray(document.$themes)
-    ? (document.$themes as TokensStudioTheme[])
+    ? (document.$themes as TokenTheme[])
     : [];
 }
 

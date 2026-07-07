@@ -106,7 +106,7 @@ The build currently:
   `$themes[].$extensions.ekinoTokenArchitect.modeSets` and only falls back to
   automatic sibling-mode inference for older token documents,
 - flattens selected token sets by theme,
-- applies the Tokens Studio preprocessor and `tokens-studio` transform group,
+- applies the `@tokens-studio/sd-transforms` preprocessor and transform group,
 - uses Style Dictionary to resolve aliases,
 - uses Style Dictionary to write CSS custom properties,
 - writes shared reference CSS once when token sets are enabled in every
@@ -118,11 +118,11 @@ The build currently:
 - renders static HTML examples and a full generated demo page,
 - writes `manifest.json`.
 
-## Tokens Studio Transforms
+## Style Dictionary Transform Package
 
-`@tokens-studio/sd-transforms` is used at the Style Dictionary boundary to keep
-the central build compatible with Tokens Studio token exports while preserving
-the existing repository orchestration.
+`@tokens-studio/sd-transforms` is used at the Style Dictionary boundary as the
+current transform package while preserving the existing repository
+orchestration.
 
 The build registers the package once, then uses:
 
@@ -140,8 +140,8 @@ This is intentionally a low-risk integration:
 - `selectedTokenSets` state values must be `source`, `enabled`, or `disabled`,
 - aliases must be set-qualified, such as `{global.color.brand}`, so the
   reference origin is explicit,
-- local Tokens Studio aliases without a set name, such as `{color.brand}`, are
-  rejected because they are ambiguous when multiple sets are active,
+- unqualified aliases without a set name, such as `{color.brand}`, are rejected
+  because they are ambiguous when multiple sets are active,
 - alias validation runs against the same effective theme set groups that the
   artifact build uses after sibling scheme-set expansion,
 - `source` sets stay in the reference/base context during scheme expansion;
