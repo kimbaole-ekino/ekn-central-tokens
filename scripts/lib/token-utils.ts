@@ -71,21 +71,15 @@ export function flattenTokens(
 }
 
 export function isTokenLeaf(value: unknown): value is TokenLeaf {
-  return (
-    isObject(value) &&
-    ("value" in value ||
-      "type" in value ||
-      "$value" in value ||
-      "$type" in value)
-  );
+  return isObject(value) && ("value" in value || "type" in value);
 }
 
 export function getLeafValue(leaf: TokenLeaf): unknown {
-  return "value" in leaf ? leaf.value : leaf.$value;
+  return leaf.value;
 }
 
 export function getLeafType(leaf: TokenLeaf): unknown {
-  return "type" in leaf ? leaf.type : leaf.$type;
+  return leaf.type;
 }
 
 export function cssVariableName(tokenPath: string): string {

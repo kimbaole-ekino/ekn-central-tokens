@@ -531,17 +531,17 @@ function colorSchemeSelector(schemeId: string): string {
 }
 
 function tokenValue(token: TokenLeaf): unknown {
-  return token.value ?? token.$value;
+  return token.value;
 }
 
 function tokenOriginalValue(token: TokenLeaf): unknown {
-  return token.original?.value ?? token.original?.$value ?? tokenValue(token);
+  return token.original?.value ?? tokenValue(token);
 }
 
 function tokenType(token: TokenLeaf): unknown {
-  return token.type ?? token.$type;
+  return token.type;
 }
 
 function tokenDescription(token: TokenLeaf): unknown {
-  return token.description ?? token.$description;
+  return token.description;
 }
