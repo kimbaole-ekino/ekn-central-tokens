@@ -4,9 +4,6 @@ export interface TokenLeaf {
   type?: string;
   value?: unknown;
   description?: string;
-  $type?: string;
-  $value?: unknown;
-  $description?: string;
   $extensions?: {
     ekinoTokenArchitect?: {
       id?: unknown;
@@ -15,7 +12,6 @@ export interface TokenLeaf {
   };
   original?: {
     value?: unknown;
-    $value?: unknown;
   };
   name?: string;
   path?: string[];
