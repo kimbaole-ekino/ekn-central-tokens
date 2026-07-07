@@ -7,7 +7,7 @@ import {
   getReferences,
   usesReferences,
 } from "style-dictionary/utils";
-import { register as registerTokensStudioTransforms } from "@tokens-studio/sd-transforms";
+import { register as registerTokenTransforms } from "@tokens-studio/sd-transforms";
 import type { TokenDocument, TokenLeaf } from "./types.js";
 import { compactObject } from "./token-utils.js";
 import { kebabSegment } from "./themes.js";
@@ -51,12 +51,12 @@ export interface CssVariableDeclaration {
   dependencies: string[];
 }
 
-let tokensStudioTransformsRegistered = false;
+let tokenTransformsRegistered = false;
 
 export function registerStyleDictionaryTransforms(): void {
-  if (tokensStudioTransformsRegistered) return;
-  registerTokensStudioTransforms(StyleDictionary);
-  tokensStudioTransformsRegistered = true;
+  if (tokenTransformsRegistered) return;
+  registerTokenTransforms(StyleDictionary);
+  tokenTransformsRegistered = true;
 }
 
 export async function buildThemeWithStyleDictionary({

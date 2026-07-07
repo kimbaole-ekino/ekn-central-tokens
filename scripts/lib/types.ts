@@ -20,7 +20,7 @@ export interface TokenLeaf {
 export type TokenNode = Record<string, unknown>;
 export type TokenDocument = Record<string, unknown>;
 
-export interface TokensStudioTheme {
+export interface TokenTheme {
   id?: unknown;
   name?: unknown;
   selectedTokenSets?: Record<string, unknown>;
