@@ -262,6 +262,18 @@ export function validateTokenDocument(
     for (const effectiveTheme of effectiveThemes) {
       const flattened = flattenTokens(document, effectiveTheme.sets);
       for (const [tokenPath, leaf] of flattened) {
+        const aliasContextErrors = getAliasContextErrors(
+          getLeafValue(leaf),
+          tokenPath,
+          flattened,
+          effectiveTheme.sourceSets ?? [],
+        );
+        errors.push(
+          ...aliasContextErrors.map(
+            (message) => `${effectiveTheme.id}:${tokenPath}: ${message}`,
+          ),
+        );
+
         try {
           resolveAlias(getLeafValue(leaf), flattened);
         } catch (error) {
@@ -286,6 +298,54 @@ function isTokenSetState(
   value: unknown,
 ): value is "enabled" | "disabled" | "source" {
   return value === "enabled" || value === "disabled" || value === "source";
+}
+
+function getAliasContextErrors(
+  value: unknown,
+  tokenPath: string,
+  activeTokens: Map<string, TokenLeaf>,
+  sourceSets: string[],
+): string[] {
+  const sourceSetNames = new Set(sourceSets);
+  const tokenSet = tokenPath.split(".")[0] ?? "";
+  const errors: string[] = [];
+
+  for (const aliasPath of getAliasPaths(value)) {
+    if (!activeTokens.has(aliasPath)) continue;
+
+    const targetSet = aliasPath.split(".")[0] ?? "";
+    if (targetSet === tokenSet || sourceSetNames.has(targetSet)) continue;
+
+    errors.push(
+      `alias {${aliasPath}} exists but is not in the allowed reference context (allowed sets: ${[
+        ...sourceSetNames,
+        tokenSet,
+      ].join(", ")})`,
+    );
+  }
+
+  return errors;
+}
+
+function getAliasPaths(value: unknown): string[] {
+  const aliases: string[] = [];
+
+  function walk(candidate: unknown): void {
+    if (typeof candidate === "string") {
+      const match = candidate.trim().match(/^\{([^{}]+)\}$/);
+      if (match) aliases.push(match[1]!);
+      return;
+    }
+
+    if (!isObject(candidate)) return;
+
+    for (const child of Object.values(candidate)) {
+      walk(child);
+    }
+  }
+
+  walk(value);
+  return aliases;
 }
 
 export interface EffectiveThemeSetGroup {
