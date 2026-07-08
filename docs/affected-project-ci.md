@@ -43,10 +43,13 @@ Affected-project detection uses changed file paths and config diffs:
 | New project added to `projects.config.json` | That project only. |
 | Existing project config changed | That project only. |
 | Target config changed in `targets.config.json` | That target project only. |
-| `blocks/pools/{pool}/...` changed | Projects that reference that block pool. |
 | `scripts/**`, `package.json`, `package-lock.json`, CI workflow changed | All projects. |
 | Manual workflow dispatch without an affected base ref | All projects. |
 | Base/head commit unavailable in the local checkout | All projects. |
+
+HTML block pool detection is a beta feature. When a changed file is under a
+configured `blocks/pools/{pool}` directory, CI maps the change back to projects
+that list that pool in `projects.config.json`.
 
 ## First Sync Behavior
 

@@ -113,7 +113,6 @@ function validateTargetsConfig(
     requireString(target.branch, `${pathPrefix}.branch`);
     requireString(target.source, `${pathPrefix}.source`);
     requireString(target.destination?.css, `${pathPrefix}.destination.css`);
-    requireString(target.destination?.html, `${pathPrefix}.destination.html`);
 
     if (!projectIds.has(target.project)) {
       throw new Error(

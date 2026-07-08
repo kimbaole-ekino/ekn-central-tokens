@@ -46,8 +46,7 @@ The central repo scripts should own orchestration:
 - deriving build themes from `tokens.json.$themes`,
 - building each project/theme target,
 - validating inputs before build,
-- writing the final manifest,
-- running static HTML block generation.
+- writing the final manifest.
 
 ## Current Implementation
 
@@ -109,13 +108,14 @@ The build currently:
 - applies the `@tokens-studio/sd-transforms` preprocessor and transform group,
 - uses Style Dictionary to resolve aliases,
 - uses Style Dictionary to write CSS custom properties,
-- writes shared reference CSS once when token sets are enabled in every
-  generated color scheme,
+- writes shared reference CSS once for selected `source` sets and other
+  reference roots shared across generated color schemes,
 - writes one `:root` CSS file per theme/color scheme and one aggregate CSS file
   with explicit `data-color-scheme` selector blocks for semantic scheme tokens,
 - uses a Style Dictionary custom format to write resolved token JSON,
 - uses a Style Dictionary custom format to write metadata JSON,
-- renders static HTML examples and a full generated demo page,
+- writes beta static HTML demo and block example files when block pools are
+  configured,
 - writes `manifest.json`.
 
 ## Style Dictionary Transform Package
@@ -187,7 +187,6 @@ scripts/build-token-artifacts.ts        # command orchestration
 scripts/lib/style-dictionary.ts         # SD config, formats, CSS naming
 scripts/lib/themes.ts                   # theme and mode-set expansion
 scripts/lib/token-utils.ts              # validation and JSON helpers
-scripts/lib/html-artifacts.ts           # demo and block HTML output
 scripts/lib/artifact-output.ts          # filesystem output helpers
 ```
 
@@ -281,9 +280,11 @@ result keeps variables semantic and shared across schemes instead of emitting
 scheme-prefixed names such as `--brand-a-primary-color` or
 `--theme-light-primary-color`.
 
-After normalization, every color scheme must expose the same CSS variable names.
-If one scheme is missing a variable or emits an extra variable, the build fails
-before writing the aggregate CSS contract.
+After normalization, color schemes are allowed to expose different CSS variable
+sets. This supports valid theme cases where one scheme has additional semantic
+tokens, such as border, spacing, or sizing values, that another scheme does not
+define. The aggregate CSS file keeps those variables scoped to the scheme block
+that defines them.
 
 ## Versioning
 

@@ -188,8 +188,11 @@ build removes color-scheme-specific set roots from CSS variable names, including
 roots that match a scheme id such as `brand-a` and roots that are unique to one
 scheme such as `theme-light` or `theme-dark`. This prevents scheme-prefixed
 variables such as `--brand-a-primary-color` or `--theme-light-primary-color`.
-The build fails if color schemes do not expose the same final CSS variable
-names.
+
+Color schemes may expose different semantic variable sets. The aggregate CSS
+file writes each variable only inside the scheme block that defines it. Target
+projects should only use variables that exist in the theme output they choose to
+consume.
 
 ### Why Split CSS By Theme
 
@@ -264,28 +267,28 @@ Example:
 dist/project-a/json/project-a.light.metadata.json
 ```
 
-## Static HTML
+## Static HTML Blocks And Demo Pages (beta)
 
-Static HTML is generated from block examples and templates:
+Static HTML block generation and demo pages are beta features. They are useful
+for preview and copy/paste experiments, but they are not part of the stable
+production artifact contract yet.
+
+The beta model uses block examples and templates:
 
 ```text
 blocks/pools/{pool}/{block}/examples.json
 blocks/pools/{pool}/{block}/template.html
 ```
 
-Output:
+Beta output:
 
 ```text
 dist/{project-id}/html/{block-id}.html
+dist/{project-id}/html/demo.html
 ```
 
-The build also writes `dist/{project-id}/html/demo.html` as a generated demo
-document. The demo uses `<html data-color-scheme="{theme-id}">` as the main
-integration example and may include a scoped `[data-color-scheme]` section when
-multiple schemes are available.
-
-This is a delivery artifact for target projects that need static HTML snippets.
-It is not generated from Figma layers.
+Current HTML output should be treated as experimental. It is not a stable
+copy/paste contract, and it is not generated from Figma layers.
 
 ## Manifest
 
@@ -322,6 +325,7 @@ Recommended shape:
     }
   },
   "html": {
+    "demo": "html/demo.html",
     "button": "html/button.html"
   }
 }
@@ -335,6 +339,11 @@ For normal CSS-token consumption, that means:
 ```text
 css/{project-id}.tokens.css
 css/{project-id}.{theme-id}.tokens.css
+```
+
+If a target opts into beta HTML delivery, it may also receive:
+
+```text
 html/*.html
 ```
 
@@ -343,8 +352,8 @@ build output by default. They are useful for tooling, audits, debugging,
 artifact lookup, and target projects that consume token data at runtime, but
 they are not required for a target that only imports CSS variables.
 
-A target should opt into JSON or manifest delivery only when it has a concrete
-consumer for those files.
+A target should opt into beta HTML, JSON, or manifest delivery only when it has
+a concrete consumer for those files.
 
 Future improvements:
 

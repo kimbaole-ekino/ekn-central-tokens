@@ -14,7 +14,7 @@ creates target project PRs/MRs for maintainer review.
 | `ci-cd.md` | Pull request validation, stale checks, and build workflow. |
 | `affected-project-ci.md` | Affected-project detection and scalable PR build policy. |
 | `style-dictionary-build.md` | Official Style Dictionary build model and repository orchestration. |
-| `generated-artifacts.md` | Generated CSS, resolved token JSON, metadata JSON, static HTML, and manifest contract. |
+| `generated-artifacts.md` | Generated CSS, resolved token JSON, metadata JSON, beta HTML previews, and manifest contract. |
 | `release-workflow.md` | Review, merge, release, and artifact handoff flow. |
 | `target-project-delivery.md` | Target project PR/MR delivery workflow and boundaries. |
 

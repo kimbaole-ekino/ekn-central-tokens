@@ -209,33 +209,6 @@ export async function buildThemeWithStyleDictionary({
   };
 }
 
-export function assertColorSchemesExposeSameVariables(
-  variableNamesByScheme: Map<string, string[]>,
-): void {
-  const entries = [...variableNamesByScheme.entries()];
-  const [firstScheme, firstNames] = entries[0] ?? [];
-  if (!firstScheme || !firstNames) return;
-
-  const firstSet = new Set(firstNames);
-  for (const [scheme, names] of entries.slice(1)) {
-    const currentSet = new Set(names);
-    const missing = firstNames.filter((name) => !currentSet.has(name));
-    const extra = names.filter((name) => !firstSet.has(name));
-
-    if (missing.length > 0 || extra.length > 0) {
-      throw new Error(
-        [
-          `Color scheme ${scheme} does not expose the same CSS variables as ${firstScheme}.`,
-          missing.length ? `Missing: ${missing.join(", ")}` : "",
-          extra.length ? `Extra: ${extra.join(", ")}` : "",
-        ]
-          .filter(Boolean)
-          .join("\n"),
-      );
-    }
-  }
-}
-
 function formatCssVariablesBlock({
   dictionary,
   selector,
