@@ -106,8 +106,7 @@ Prefer a GitHub App token or narrowly scoped bot token over a personal token.
       "branch": "main",
       "source": "dist/project-a",
       "destination": {
-        "css": "src/styles/tokens/css",
-        "html": "src/styles/tokens/html"
+        "css": "src/styles/tokens/css"
       },
       "delivery": {
         "provider": "github",
@@ -130,7 +129,7 @@ Each target entry requires:
 | `branch`                | Yes      | Target base branch for the delivery PR/MR. Usually `main`.                                                                                             |
 | `source`                | Yes      | Built artifact folder in this repo, usually `dist/{project-id}`.                                                                                       |
 | `destination.css`       | Yes      | Directory in the target repo where generated CSS token files are copied.                                                                               |
-| `destination.html`      | Yes      | Directory in the target repo where generated static HTML block files are copied.                                                                       |
+| `destination.html`      | No       | Beta directory for generated static HTML block files. Useful for preview/copy experiments, but not part of the stable production contract yet.          |
 | `destination.json`      | No       | Directory in the target repo where generated resolved token JSON and metadata JSON files are copied when the target has a runtime or tooling consumer. |
 | `destination.manifest`  | No       | File path in the target repo for `manifest.json` when the target needs an artifact lookup contract.                                                    |
 | `delivery.provider`     | No       | Currently expected to be `github` when present.                                                                                                        |
@@ -149,8 +148,7 @@ Each target entry requires:
 {
   "id": "project-c",
   "tokenFile": "token-definitions/projects/project-c/tokens.json",
-  "outputDir": "dist/project-c",
-  "blockPools": ["core"]
+  "outputDir": "dist/project-c"
 }
 ```
 
@@ -163,8 +161,7 @@ Each target entry requires:
   "branch": "main",
   "source": "dist/project-c",
   "destination": {
-    "css": "src/styles/tokens/css",
-    "html": "src/styles/tokens/html"
+    "css": "src/styles/tokens/css"
   },
   "delivery": {
     "provider": "github",
@@ -178,9 +175,13 @@ The mapping is:
 
 ```text
 token-definitions/projects/project-c/tokens.json
--> build output dist/project-c
+-> themed build output dist/project-c
 -> target repo destination paths from targets.config.json
 ```
+
+Central delivery does not model parent/child project runtime behavior. The
+central repository builds the available theme outputs. Target projects decide
+which theme output to import for their own child-project or runtime structure.
 
 Generated artifact names are preserved during delivery. For example:
 
@@ -271,7 +272,7 @@ Target delivery requires:
 - `manifest.json` in central build output,
 - target repo name,
 - target base branch,
-- destination paths,
+- destination paths for current artifacts,
 - target repository token in apply mode.
 
 ## Delivery Output
@@ -279,13 +280,14 @@ Target delivery requires:
 The delivery script copies:
 
 - `dist/{project-id}/css/` to `destination.css`,
-- `dist/{project-id}/html/` to `destination.html`,
 - `dist/{project-id}/json/` to `destination.json` only when configured,
 - `dist/{project-id}/manifest.json` to `destination.manifest` only when
-  configured.
+  configured,
+- `dist/{project-id}/html/` to `destination.html` only for beta HTML block
+  delivery when both the output and destination are explicitly configured.
 
-By default, target PRs/MRs should include CSS and static HTML only. Metadata
-JSON, resolved token JSON, and `manifest.json` are central build artifacts for
+By default, target PRs/MRs should include CSS theme output only. Metadata JSON,
+resolved token JSON, and `manifest.json` are central build artifacts for
 tooling, debugging, audits, and artifact lookup. Deliver them to a target only
 when the target project has documented runtime or tooling usage for them.
 
@@ -301,7 +303,7 @@ It then creates a delivery branch named from:
 Example:
 
 ```text
-tokens/project-a-20260625T080000Z
+tokens/project-a-abc1234def56
 ```
 
 ## Apply-Mode Flow

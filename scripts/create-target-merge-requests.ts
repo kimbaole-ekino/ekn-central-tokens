@@ -24,7 +24,6 @@ interface ValidatedTarget extends TargetConfig {
   source: string;
   destination: TargetDestination & {
     css: string;
-    html: string;
   };
   delivery?: Record<string, unknown>;
 }
@@ -146,7 +145,6 @@ function validateTarget(target: TargetConfig): {
     ["branch", target.branch],
     ["source", target.source],
     ["destination.css", target.destination?.css],
-    ["destination.html", target.destination?.html],
   ];
 
   for (const [field, value] of requiredStrings) {
@@ -233,13 +231,16 @@ function getMappings(
       destination: destination.css,
       type: "directory",
     },
-    {
+  ];
+
+  if (destination.html) {
+    mappings.push({
       label: "html",
       source: path.join(sourceDir, "html"),
       destination: destination.html,
       type: "directory",
-    },
-  ];
+    });
+  }
 
   if (destination.json) {
     mappings.push({

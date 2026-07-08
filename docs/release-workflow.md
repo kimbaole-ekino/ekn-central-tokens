@@ -43,7 +43,7 @@ Before merge, reviewers should check:
 - aliases resolve,
 - stable token IDs are not duplicated,
 - generated CSS paths are correct,
-- generated HTML blocks still render valid markup,
+- beta generated HTML blocks still render valid markup when block pools change,
 - manifest paths match generated artifact expectations and any optional target
   delivery configuration,
 - stale check is passing or intentionally skipped because SHA inputs are absent.

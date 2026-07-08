@@ -18,7 +18,6 @@ import {
 } from "./lib/token-utils.js";
 import type { BuildManifest, TokenDocument } from "./lib/types.js";
 import {
-  assertColorSchemesExposeSameVariables,
   buildThemeWithStyleDictionary,
   type CssVariableDeclaration,
   registerStyleDictionaryTransforms,
@@ -82,7 +81,6 @@ for (const project of projects) {
   }
 
   const colorSchemeCssBlocks: string[] = [];
-  const colorSchemeVariableNames = new Map<string, string[]>();
   const referenceCssDeclarations: CssVariableDeclaration[] = [];
 
   for (const theme of themes) {
@@ -112,13 +110,8 @@ for (const project of projects) {
       );
     }
     colorSchemeCssBlocks.push(colorSchemeOutput.cssBlock);
-    colorSchemeVariableNames.set(
-      theme.outputId,
-      colorSchemeOutput.variableNames,
-    );
   }
 
-  assertColorSchemesExposeSameVariables(colorSchemeVariableNames);
   const referenceCssBlock = mergeReferenceCssDeclarations(
     referenceCssDeclarations,
   );

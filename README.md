@@ -60,12 +60,13 @@ docs/
   enabled scheme sets into effective themes, keeps `source` sets as reference
   context, validates set-qualified aliases inside each effective theme context,
   and rejects missing-set, inactive-context, or cyclic aliases.
-- `projects.config.json` defines which projects are built.
-- `blocks/` contains static HTML block contracts and examples.
+- `projects.config.json` defines which token projects are built by theme.
+- `blocks/` contains beta static HTML block contracts and examples.
 - `scripts/build-token-artifacts.ts` orchestrates Style Dictionary token
-  processing, static HTML generation, and `manifest.json` output.
-- `targets.config.json` describes where generated artifacts are written in
-  target projects.
+  processing, beta static HTML generation, and `manifest.json` output.
+- `targets.config.json` describes where generated themed artifacts can be
+  delivered. Target projects own any child-project mapping after consuming the
+  selected theme output.
 - `scripts/create-target-merge-requests.ts` validates target delivery locally
   by default and can create target project PRs/MRs in explicit apply mode.
 
@@ -200,6 +201,10 @@ token-definitions/projects/{project-id}/tokens.json
 ```
 
 `dist/` is intentionally ignored by Git.
+
+HTML blocks and demo pages are beta features. They are useful for preview and
+copy/paste experiments, but they are not part of the stable production artifact
+contract yet.
 
 ## Documentation
 

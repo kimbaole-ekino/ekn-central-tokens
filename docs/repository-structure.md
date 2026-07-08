@@ -54,8 +54,8 @@ ekn-central-tokens/
 | Path | Owner | Purpose |
 | --- | --- | --- |
 | `token-definitions/` | Figma plugin output, central repo review | Canonical plugin-submitted token source files. |
-| `projects.config.json` | Central token repo | Project build matrix and source/output paths. |
-| `blocks/` | Central token repo | Static HTML block contracts and examples. |
+| `projects.config.json` | Central token repo | Token project build matrix and source/output paths. |
+| `blocks/` | Beta | Static HTML block contracts and examples. Useful for preview and copy/paste experiments, but not part of the stable production artifact contract yet. |
 | `scripts/` | Central token repo | Validation, build, stale check, and target PR/MR delivery scripts. |
 | `targets.config.json` | Central token repo | Target project delivery destinations. |
 | `.github/workflows/` | Central token repo | CI and manual target delivery workflows. |

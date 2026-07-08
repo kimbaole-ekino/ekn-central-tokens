@@ -132,10 +132,7 @@ export function writeBlockExamples(
   }
 }
 
-function renderChildBlock(
-  poolDir: string,
-  child: BlockChild,
-): string {
+function renderChildBlock(poolDir: string, child: BlockChild): string {
   if (typeof child.type !== "string") {
     throw new Error("Block child must include a string type.");
   }
