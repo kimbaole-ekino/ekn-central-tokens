@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "validate": "npm run validate:tokens && npm run check:stale-token-pr && npm run build:artifacts && npm run delivery:target-mr",
+    "test": "tsx --test tests/*.test.ts",
+    "validate": "npm test && npm run typecheck && npm run validate:tokens && npm run check:stale-token-pr && npm run build:artifacts && npm run delivery:target-mr",
     "validate:tokens": "tsx scripts/validate-token-projects.ts",
     "detect:affected-projects": "tsx scripts/detect-affected-token-projects.ts",
     "build:style-dictionary": "tsx scripts/build-token-artifacts.ts",

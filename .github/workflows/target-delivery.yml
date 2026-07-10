@@ -10,6 +10,7 @@ on:
       - "projects.config.json"
       - "targets.config.json"
       - "scripts/**"
+      - "tests/**"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/target-delivery.yml"
@@ -39,6 +40,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
       - name: Detect affected token projects
         if: github.event_name == 'push'
         run: npm run detect:affected-projects -- --base=${{ github.event.before }} --head=${{ github.sha }}

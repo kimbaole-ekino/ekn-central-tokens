@@ -38,6 +38,7 @@ export interface TokenProject {
   tokenFile: string;
   outputDir: string;
   blockPools?: string[];
+  themeFolders?: boolean;
   [key: string]: unknown;
 }
 
@@ -74,12 +75,21 @@ export interface BuildTheme {
   sourceSets?: string[];
   modeSets?: string[];
   outputId: string;
+  groupId: string;
+  groupName: string;
 }
 
 export interface ManifestThemeEntry {
   css: string;
   resolvedTokens: string;
   metadata: string;
+  group?: string;
+}
+
+export interface ManifestThemeGroupEntry {
+  css: string;
+  referenceCss?: string;
+  themes: string[];
 }
 
 export interface BuildManifest {
@@ -87,8 +97,9 @@ export interface BuildManifest {
   version: string;
   buildTime: string;
   sourceCommit: string;
-  css: string;
+  css?: string;
   referenceCss?: string;
   themes: Record<string, ManifestThemeEntry>;
+  themeGroups?: Record<string, ManifestThemeGroupEntry>;
   html: Record<string, string>;
 }

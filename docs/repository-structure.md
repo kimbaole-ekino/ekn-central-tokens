@@ -43,6 +43,9 @@ ekn-central-tokens/
       token-utils.ts
       types.ts
 
+  tests/
+    theme-folders.test.ts
+
   projects.config.json
   targets.config.json
   .github/workflows/
@@ -51,15 +54,16 @@ ekn-central-tokens/
 
 ## Ownership
 
-| Path | Owner | Purpose |
-| --- | --- | --- |
-| `token-definitions/` | Figma plugin output, central repo review | Canonical plugin-submitted token source files. |
-| `projects.config.json` | Central token repo | Token project build matrix and source/output paths. |
-| `blocks/` | Beta | Static HTML block contracts and examples. Useful for preview and copy/paste experiments, but not part of the stable production artifact contract yet. |
-| `scripts/` | Central token repo | Validation, build, stale check, and target PR/MR delivery scripts. |
-| `targets.config.json` | Central token repo | Target project delivery destinations. |
-| `.github/workflows/` | Central token repo | CI and manual target delivery workflows. |
-| `dist/` | Generated | Build output. Ignored by Git. |
+| Path                   | Owner                                    | Purpose                                                                                                                                               |
+| ---------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `token-definitions/`   | Figma plugin output, central repo review | Canonical plugin-submitted token source files.                                                                                                        |
+| `projects.config.json` | Central token repo                       | Token project build matrix, source/output paths, and optional `themeFolders` layout.                                                                  |
+| `blocks/`              | Beta                                     | Static HTML block contracts and examples. Useful for preview and copy/paste experiments, but not part of the stable production artifact contract yet. |
+| `scripts/`             | Central token repo                       | Validation, build, stale check, and target PR/MR delivery scripts.                                                                                    |
+| `tests/`               | Central token repo                       | Node tests for build orchestration and artifact contracts.                                                                                            |
+| `targets.config.json`  | Central token repo                       | Target project delivery destinations.                                                                                                                 |
+| `.github/workflows/`   | Central token repo                       | CI and manual target delivery workflows.                                                                                                              |
+| `dist/`                | Generated                                | Build output. Ignored by Git.                                                                                                                         |
 
 `projects.config.json` and `targets.config.json` may be committed before a new
 project's `tokens.json` exists. The first Figma plugin sync creates that token

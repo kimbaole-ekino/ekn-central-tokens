@@ -8,6 +8,9 @@ on:
       - "projects.config.json"
       - "targets.config.json"
       - "scripts/**"
+      - "tests/**"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/token-ci.yml"
   workflow_dispatch:
 
@@ -23,6 +26,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
       - name: Detect affected token projects
         if: github.event_name == 'pull_request'
         run: npm run detect:affected-projects -- --base=${{ github.event.pull_request.base.sha }} --head=${{ github.sha }}

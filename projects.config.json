@@ -10,6 +10,7 @@
       "id": "havas-network-websites",
       "tokenFile": "token-definitions/projects/havas-network-websites/tokens.json",
       "outputDir": "dist/havas-network-websites",
+      "themeFolders": true,
       "blockPools": ["core"]
     }
   ]

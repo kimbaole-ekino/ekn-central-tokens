@@ -163,13 +163,20 @@ This is intentionally a low-risk integration:
 - a set marked `source` in any effective theme is treated as a reference root
   for the full project build, even if another generated theme still has that
   set as `enabled`,
+- flat projects dedupe expanded themes that produce the same generated theme id
+  when their ordered effective token sets and source sets match; this supports
+  multiple designer themes reusing the same mode set while still rejecting
+  filename collisions with different output,
+- projects with `themeFolders: true` group effective modes by their parent
+  `$themes[]` entry and compute source/reference roots inside that group only;
+  source state cannot leak from one parent theme folder into another,
 - active sets are processed as `source` sets first, then `enabled` sets, so the
   build does not depend on object insertion order from generated token JSON,
 - generated `reference.css` is built from Style Dictionary token/dictionary
   declarations rather than by parsing a generated CSS file,
-- generated `reference.css` merges source/reference declarations from every
-  effective theme so shared variables are not missed when themes use different
-  source sets,
+- generated `reference.css` merges source/reference declarations from the
+  effective themes in its current build scope: the full project for flat output
+  or one parent theme for foldered output,
 - `reference.css` declarations are dependency-ordered, so a variable such as
   `--global-color-white` is emitted before declarations that use
   `var(--global-color-white)`; missing or cyclic reference CSS dependencies
@@ -206,6 +213,21 @@ dist/{project-id}/json/{project-id}.{theme-id}.resolved-tokens.json
 dist/{project-id}/json/{project-id}.{theme-id}.metadata.json
 dist/{project-id}/manifest.json
 ```
+
+Opt-in foldered output (`projects.config.json` with `themeFolders: true`) uses:
+
+```text
+dist/{project-id}/css/{parent-theme}/reference.css
+dist/{project-id}/css/{parent-theme}/token.css
+dist/{project-id}/css/{parent-theme}/{theme-id}.css
+dist/{project-id}/json/{parent-theme}/{theme-id}.resolved-tokens.json
+dist/{project-id}/json/{parent-theme}/{theme-id}.metadata.json
+dist/{project-id}/manifest.json
+```
+
+`manifest.themeGroups` records the aggregate CSS, optional reference CSS, and
+mode entries for each folder. The existing top-level `css` and `referenceCss`
+manifest fields remain unchanged for flat projects.
 
 ## Required Transform Behavior
 

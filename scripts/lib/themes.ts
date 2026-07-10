@@ -81,8 +81,11 @@ export function getThemesFromTokenDocument(
     );
   }
 
-  const outputIds = new Set<string>();
+  const outputSignatures = new Map<string, string>();
   const themes: Omit<BuildTheme, "outputId">[] = [];
+  const flatSourceSetNames = project.themeFolders
+    ? new Set<string>()
+    : getProjectSourceSetNames(tokens.$themes);
 
   for (const theme of tokens.$themes) {
     if (!isObject(theme)) {
@@ -95,15 +98,22 @@ export function getThemesFromTokenDocument(
     const selectedTokenSets = isObject(theme.selectedTokenSets)
       ? theme.selectedTokenSets
       : {};
-    const sourceSets = Object.entries(selectedTokenSets)
+    const rawSourceSets = Object.entries(selectedTokenSets)
       .filter(([, state]) => state === "source")
       .map(([setName]) => setName);
-    const enabledSets = Object.entries(selectedTokenSets)
+    const rawEnabledSets = Object.entries(selectedTokenSets)
       .filter(([, state]) => state === "enabled")
       .map(([setName]) => setName);
+    const sourceSets = [
+      ...rawSourceSets,
+      ...rawEnabledSets.filter((setName) => flatSourceSetNames.has(setName)),
+    ];
+    const enabledSets = rawEnabledSets.filter(
+      (setName) => !flatSourceSetNames.has(setName),
+    );
     const sets = [...sourceSets, ...enabledSets];
 
-    if (enabledSets.length === 0) {
+    if (rawEnabledSets.length === 0) {
       throw new Error(
         `${project.tokenFile} theme ${theme.id} must include at least one enabled token set.`,
       );
@@ -114,7 +124,21 @@ export function getThemesFromTokenDocument(
         `${project.tokenFile} theme ${theme.id} has no active token sets.`,
       );
     }
-    const modeSets = getExplicitModeSets(theme, enabledSets);
+    const modeSets = getExplicitModeSets(theme, rawEnabledSets)?.filter(
+      (setName) => !flatSourceSetNames.has(setName),
+    );
+    if (enabledSets.length === 0) {
+      continue;
+    }
+
+    const groupId =
+      themeOutputSegment(project.id, String(theme.name ?? theme.id)) ||
+      themeOutputSegment(project.id, theme.id);
+    if (!groupId) {
+      throw new Error(
+        `${project.tokenFile} theme ${theme.id} does not produce a valid theme folder name.`,
+      );
+    }
 
     themes.push(
       ...expandThemeModeSets(
@@ -127,13 +151,18 @@ export function getThemesFromTokenDocument(
           sets,
           sourceSets,
           modeSets,
+          groupId,
+          groupName:
+            typeof theme.name === "string" && theme.name.trim()
+              ? theme.name
+              : theme.id,
         },
         tokens,
       ),
     );
   }
 
-  return themes.map((theme) => {
+  return themes.flatMap((theme) => {
     const outputName = theme.name;
     const outputId =
       themeOutputSegment(project.id, outputName) ||
@@ -143,17 +172,46 @@ export function getThemesFromTokenDocument(
         `${project.tokenFile} theme ${theme.id} does not produce a valid kebab-case theme output name.`,
       );
     }
-    if (outputIds.has(outputId)) {
+    const outputKey = project.themeFolders
+      ? `${theme.groupId}/${outputId}`
+      : outputId;
+    const outputSignature = getThemeOutputSignature(theme);
+    const existingSignature = outputSignatures.get(outputKey);
+    if (existingSignature === outputSignature) return [];
+    if (existingSignature) {
       throw new Error(
         `${project.tokenFile} has multiple themes that produce generated theme id ${outputId}.`,
       );
     }
-    outputIds.add(outputId);
+    outputSignatures.set(outputKey, outputSignature);
 
-    return {
-      ...theme,
-      outputId,
-    };
+    return [
+      {
+        ...theme,
+        outputId,
+      },
+    ];
+  });
+}
+
+function getProjectSourceSetNames(themes: unknown[]): Set<string> {
+  const sourceSetNames = new Set<string>();
+  for (const theme of themes) {
+    if (!isObject(theme)) continue;
+    const selectedTokenSets = isObject(theme.selectedTokenSets)
+      ? theme.selectedTokenSets
+      : {};
+    for (const [setName, state] of Object.entries(selectedTokenSets)) {
+      if (state === "source") sourceSetNames.add(setName);
+    }
+  }
+  return sourceSetNames;
+}
+
+function getThemeOutputSignature(theme: Omit<BuildTheme, "outputId">): string {
+  return JSON.stringify({
+    sets: theme.sets,
+    sourceSets: theme.sourceSets ?? [],
   });
 }
 
@@ -162,6 +220,27 @@ export function expandThemeModeSets(
   tokens: TokenDocument,
 ): Omit<BuildTheme, "outputId">[] {
   return expandEffectiveThemeSetGroups(theme, tokens);
+}
+
+export function groupThemesByParent(
+  themes: BuildTheme[],
+): Array<{ id: string; name: string; themes: BuildTheme[] }> {
+  const groups = new Map<
+    string,
+    { id: string; name: string; themes: BuildTheme[] }
+  >();
+
+  for (const theme of themes) {
+    const group = groups.get(theme.groupId) ?? {
+      id: theme.groupId,
+      name: theme.groupName,
+      themes: [],
+    };
+    group.themes.push(theme);
+    groups.set(theme.groupId, group);
+  }
+
+  return [...groups.values()];
 }
 
 export function kebabSegment(value: unknown): string {
