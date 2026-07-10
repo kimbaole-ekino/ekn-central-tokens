@@ -93,6 +93,12 @@ Typecheck TypeScript scripts:
 npm run typecheck
 ```
 
+Run repository tests:
+
+```bash
+npm test
+```
+
 Build generated artifacts:
 
 ```bash
@@ -176,11 +182,34 @@ dist/project-a/html/*.html
 dist/project-a/manifest.json
 ```
 
-Generated artifact filenames use:
+Projects that set `"themeFolders": true` in `projects.config.json` use an
+isolated parent-theme layout instead:
+
+```text
+dist/project-a/css/health/reference.css
+dist/project-a/css/health/token.css
+dist/project-a/css/health/health-white.css
+dist/project-a/css/health/health-black.css
+dist/project-a/css/cx/reference.css
+dist/project-a/css/cx/token.css
+dist/project-a/css/cx/cx-white.css
+dist/project-a/css/cx/cx-black.css
+```
+
+In this mode, source and reference roots are computed within each parent theme.
+A set marked `source` in `health` therefore does not become a source for `cx`.
+The default remains the flat layout for projects that omit the option.
+
+Flat generated artifact filenames use:
 
 ```text
 {project-id}.{theme-id}.{artifact-type}.{ext}
 ```
+
+When two expanded themes produce the same flat `{theme-id}` and use the same
+ordered effective token sets, the build writes one shared artifact instead of
+failing. If the generated id matches but the effective sets differ, the build
+still fails because the filename would hide different output.
 
 The aggregate CSS file uses:
 

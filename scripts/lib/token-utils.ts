@@ -84,13 +84,6 @@ export function getLeafType(leaf: TokenLeaf): unknown {
   return leaf.type;
 }
 
-export function cssVariableName(tokenPath: string): string {
-  return `--${tokenPath
-    .replace(/[^a-zA-Z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .toLowerCase()}`;
-}
-
 export function resolveAlias(
   value: unknown,
   tokens: Map<string, TokenLeaf>,
@@ -296,10 +289,10 @@ export interface EffectiveThemeSetGroup {
   modeSets?: string[];
 }
 
-export function expandEffectiveThemeSetGroups(
-  theme: EffectiveThemeSetGroup,
+export function expandEffectiveThemeSetGroups<T extends EffectiveThemeSetGroup>(
+  theme: T,
   tokens: TokenDocument,
-): EffectiveThemeSetGroup[] {
+): T[] {
   const sourceSetNames = new Set(theme.sourceSets ?? []);
   const modeCandidateSets = theme.sets.filter(
     (setName) => !sourceSetNames.has(setName),
@@ -322,10 +315,12 @@ export function expandEffectiveThemeSetGroups(
   const baseSets = theme.sets.filter((setName) => !modeSetNames.has(setName));
 
   return modeSets.map((setName) => ({
+    ...theme,
     id: `${theme.id}:${setName}`,
     name: setName,
     sets: [...baseSets, setName],
     sourceSets: theme.sourceSets,
+    modeSets: undefined,
   }));
 }
 

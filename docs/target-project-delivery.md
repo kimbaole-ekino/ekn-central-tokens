@@ -129,7 +129,7 @@ Each target entry requires:
 | `branch`                | Yes      | Target base branch for the delivery PR/MR. Usually `main`.                                                                                             |
 | `source`                | Yes      | Built artifact folder in this repo, usually `dist/{project-id}`.                                                                                       |
 | `destination.css`       | Yes      | Directory in the target repo where generated CSS token files are copied.                                                                               |
-| `destination.html`      | No       | Beta directory for generated static HTML block files. Useful for preview/copy experiments, but not part of the stable production contract yet.          |
+| `destination.html`      | No       | Beta directory for generated static HTML block files. Useful for preview/copy experiments, but not part of the stable production contract yet.         |
 | `destination.json`      | No       | Directory in the target repo where generated resolved token JSON and metadata JSON files are copied when the target has a runtime or tooling consumer. |
 | `destination.manifest`  | No       | File path in the target repo for `manifest.json` when the target needs an artifact lookup contract.                                                    |
 | `delivery.provider`     | No       | Currently expected to be `github` when present.                                                                                                        |
@@ -195,6 +195,21 @@ dist/project-a/css/project-a.tokens.css
 dist/project-a/css/project-a.light.tokens.css
 -> src/styles/tokens/css/project-a.light.tokens.css
 ```
+
+Foldered projects preserve their directories too:
+
+```text
+dist/project-a/css/health/reference.css
+-> src/styles/tokens/css/health/reference.css
+
+dist/project-a/css/health/token.css
+-> src/styles/tokens/css/health/token.css
+```
+
+Consumers of foldered output should read `manifest.themeGroups` or select a
+known parent-theme folder, then import that folder's `reference.css` before
+`token.css`. Target delivery already copies the complete `css/` directory, so
+no delivery mapping change is required.
 
 Target project examples should consume generated CSS through delivered paths:
 

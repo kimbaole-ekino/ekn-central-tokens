@@ -8,6 +8,7 @@ import {
   getColorSchemeRootSegments,
   getReferenceRootSegments,
   getThemesFromTokenDocument,
+  groupThemesByParent,
   selectThemeTokens,
 } from "./lib/themes.js";
 import {
@@ -24,6 +25,8 @@ import {
 } from "./lib/style-dictionary.js";
 import {
   getSourceCommit,
+  getThemeArtifactPaths,
+  getThemeGroupCssPaths,
   resetOutputDir,
   writeCssBlocks,
 } from "./lib/artifact-output.js";
@@ -53,79 +56,119 @@ for (const project of projects) {
   validateTokenDocument(tokens, project.tokenFile);
 
   const themes = getThemesFromTokenDocument(project, tokens);
-  const colorSchemeRootSegments = getColorSchemeRootSegments(themes);
-  const referenceRootSegments = getReferenceRootSegments(
-    themes,
-    colorSchemeRootSegments,
-  );
-  const splitReferenceCss =
-    colorSchemeRootSegments.size > 0 && referenceRootSegments.size > 0;
+  const themeGroups = project.themeFolders
+    ? groupThemesByParent(themes)
+    : [{ id: "", name: project.id, themes }];
   const outputDir = path.join(rootDir, project.outputDir);
   resetOutputDir(rootDir, outputDir, project);
 
   const buildTime = new Date().toISOString();
   const sourceCommit = getSourceCommit(rootDir);
-  const aggregateCssFile = `css/${project.id}.tokens.css`;
-  const referenceCssFile = `css/${project.id}.reference.css`;
   const manifest: BuildManifest = {
     project: project.id,
     version: getArtifactVersion(sourceCommit),
     buildTime,
     sourceCommit,
-    css: aggregateCssFile,
     themes: {},
     html: {},
   };
-  if (splitReferenceCss) {
-    manifest.referenceCss = referenceCssFile;
+  if (project.themeFolders) {
+    manifest.themeGroups = {};
   }
 
-  const colorSchemeCssBlocks: string[] = [];
-  const referenceCssDeclarations: CssVariableDeclaration[] = [];
+  const builtThemeGroups: Array<{
+    css: string;
+    referenceCss?: string;
+    themes: typeof themes;
+  }> = [];
 
-  for (const theme of themes) {
-    const artifactBase = `${project.id}.${theme.outputId}`;
-    const cssFile = `css/${artifactBase}.tokens.css`;
-    const resolvedTokensFile = `json/${artifactBase}.resolved-tokens.json`;
-    const metadataFile = `json/${artifactBase}.metadata.json`;
-    const colorSchemeOutput = await buildThemeWithStyleDictionary({
-      tokens: selectThemeTokens(tokens, theme.sets),
-      outputDir,
-      cssFile,
-      resolvedTokensFile,
-      metadataFile,
-      themeId: theme.outputId,
+  for (const themeGroup of themeGroups) {
+    const colorSchemeRootSegments = getColorSchemeRootSegments(
+      themeGroup.themes,
+    );
+    const referenceRootSegments = getReferenceRootSegments(
+      themeGroup.themes,
       colorSchemeRootSegments,
-      splitReferenceCss,
-    });
+    );
+    const splitReferenceCss =
+      colorSchemeRootSegments.size > 0 && referenceRootSegments.size > 0;
+    const groupPaths = getThemeGroupCssPaths(project, themeGroup.id);
+    const colorSchemeCssBlocks: string[] = [];
+    const referenceCssDeclarations: CssVariableDeclaration[] = [];
 
-    manifest.themes[theme.outputId] = {
-      css: cssFile,
-      resolvedTokens: resolvedTokensFile,
-      metadata: metadataFile,
-    };
-    if (splitReferenceCss) {
-      referenceCssDeclarations.push(
-        ...colorSchemeOutput.referenceCssDeclarations,
-      );
+    if (project.themeFolders) {
+      manifest.themeGroups![themeGroup.id] = {
+        css: groupPaths.css,
+        themes: [],
+      };
+      if (splitReferenceCss) {
+        manifest.themeGroups![themeGroup.id]!.referenceCss =
+          groupPaths.referenceCss;
+      }
+    } else {
+      manifest.css = groupPaths.css;
+      if (splitReferenceCss) manifest.referenceCss = groupPaths.referenceCss;
     }
-    colorSchemeCssBlocks.push(colorSchemeOutput.cssBlock);
+
+    for (const theme of themeGroup.themes) {
+      const paths = getThemeArtifactPaths(project, theme);
+      const colorSchemeOutput = await buildThemeWithStyleDictionary({
+        tokens: selectThemeTokens(tokens, theme.sets),
+        outputDir,
+        cssFile: paths.css,
+        resolvedTokensFile: paths.resolvedTokens,
+        metadataFile: paths.metadata,
+        themeId: theme.outputId,
+        colorSchemeRootSegments,
+        splitReferenceCss,
+      });
+
+      manifest.themes[paths.manifestKey] = {
+        css: paths.css,
+        resolvedTokens: paths.resolvedTokens,
+        metadata: paths.metadata,
+        ...(project.themeFolders ? { group: theme.groupId } : {}),
+      };
+      if (project.themeFolders) {
+        manifest.themeGroups![themeGroup.id]!.themes.push(paths.manifestKey);
+      }
+      if (splitReferenceCss) {
+        referenceCssDeclarations.push(
+          ...colorSchemeOutput.referenceCssDeclarations,
+        );
+      }
+      colorSchemeCssBlocks.push(colorSchemeOutput.cssBlock);
+    }
+
+    const referenceCssBlock = mergeReferenceCssDeclarations(
+      referenceCssDeclarations,
+    );
+    if (splitReferenceCss) {
+      if (!referenceCssBlock) {
+        throw new Error(
+          `Theme group ${themeGroup.name} did not produce reference CSS declarations.`,
+        );
+      }
+      writeCssBlocks(outputDir, groupPaths.referenceCss, [referenceCssBlock]);
+    }
+    writeCssBlocks(outputDir, groupPaths.css, colorSchemeCssBlocks);
+    builtThemeGroups.push({
+      css: groupPaths.css,
+      referenceCss: splitReferenceCss ? groupPaths.referenceCss : undefined,
+      themes: themeGroup.themes,
+    });
   }
 
-  const referenceCssBlock = mergeReferenceCssDeclarations(
-    referenceCssDeclarations,
-  );
-  if (splitReferenceCss && referenceCssBlock) {
-    writeCssBlocks(outputDir, referenceCssFile, [referenceCssBlock]);
+  const demoThemeGroup = builtThemeGroups[0];
+  if (demoThemeGroup) {
+    writeHtmlDemo(
+      outputDir,
+      demoThemeGroup.css,
+      demoThemeGroup.referenceCss,
+      demoThemeGroup.themes,
+      manifest.html,
+    );
   }
-  writeCssBlocks(outputDir, manifest.css, colorSchemeCssBlocks);
-  writeHtmlDemo(
-    outputDir,
-    manifest.css,
-    manifest.referenceCss,
-    themes,
-    manifest.html,
-  );
   writeBlockExamples(rootDir, outputDir, project, manifest.html);
 
   writeFile(

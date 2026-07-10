@@ -49,9 +49,30 @@ dist/project-a/
   manifest.json
 ```
 
+Projects can opt into parent-theme folders with `themeFolders: true`:
+
+```text
+dist/project-a/
+  css/health/reference.css
+  css/health/token.css
+  css/health/health-white.css
+  css/health/health-black.css
+  css/cx/reference.css
+  css/cx/token.css
+  css/cx/cx-white.css
+  css/cx/cx-black.css
+  json/health/health-white.resolved-tokens.json
+  json/health/health-white.metadata.json
+  manifest.json
+```
+
+Each folder corresponds to one parent `$themes[]` entry. Its `reference.css`
+is derived only from that parent theme's effective modes, so `source` state in
+one folder does not affect another folder. The flat layout remains the default.
+
 ## Naming Convention
 
-Generated artifact naming follows:
+Flat generated artifact naming follows:
 
 ```text
 {project-id}.{theme-id}.{artifact-type}.{ext}
@@ -103,6 +124,10 @@ dist/{project-id}/manifest.json
 build output. It is required in central build output, but optional in target
 project delivery. It is delivered to target projects only when their tooling
 needs that lookup contract.
+
+Foldered projects use `manifest.themeGroups` and qualified theme keys such as
+`health/health-white`. Flat projects retain the top-level `css`,
+`referenceCss`, and unqualified theme keys.
 
 ## CSS
 

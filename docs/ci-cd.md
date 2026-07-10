@@ -14,8 +14,9 @@ target PR/MR delivery details are documented in `target-project-delivery.md`.
 | `.github/workflows/token-ci.yml`        | Pull request, manual dispatch   | Validate token sources and build artifacts.                 |
 | `.github/workflows/target-delivery.yml` | Push to `main`, manual dispatch | Build affected artifacts and create target project PRs/MRs. |
 
-Both workflows run `npm ci` before repository scripts so CI uses the locked
-`style-dictionary` dependency from `package-lock.json`.
+Both workflows run `npm ci`, `npm test`, and `npm run typecheck` before build
+scripts so CI uses the locked `style-dictionary` dependency and verifies build
+orchestration contracts before producing or delivering artifacts.
 
 ## Pull Request Flow
 
@@ -71,6 +72,8 @@ npm run validate
 This expands to:
 
 ```bash
+npm test
+npm run typecheck
 npm run validate:tokens
 npm run check:stale-token-pr
 npm run build:artifacts
