@@ -11,10 +11,15 @@ import type {
   TargetDestination,
   TokenProject,
 } from "./lib/types.js";
+import { copyArtifactsRecursively } from "./lib/copy-artifacts.js";
+import {
+  getDeliveryMappings,
+  type DeliveryMapping,
+} from "./lib/delivery-mappings.js";
+import { validateTargetsConfig } from "./validate-token-projects.js";
 
 interface ArtifactManifest {
-  version: string;
-  [key: string]: unknown;
+  version?: string;
 }
 
 interface ValidatedTarget extends TargetConfig {
@@ -25,14 +30,7 @@ interface ValidatedTarget extends TargetConfig {
   destination: TargetDestination & {
     css: string;
   };
-  delivery?: Record<string, unknown>;
-}
-
-interface DeliveryMapping {
-  label: string;
-  source: string;
-  destination: string;
-  type: "directory" | "file";
+  delivery?: TargetConfig["delivery"];
 }
 
 interface Delivery {
@@ -64,6 +62,7 @@ const projectsConfig = getProjectsConfig(rootDir);
 const projectById = new Map(
   (projectsConfig.projects ?? []).map((project) => [project.id, project]),
 );
+validateTargetsConfig(config, projectsConfig, new Set(projectById.keys()));
 const targets = (config.targets ?? []).filter((target) => {
   if (selectedProjects) return selectedProjects.has(target.project);
   return !selectedProject || target.project === selectedProject;
@@ -93,14 +92,7 @@ if (isApplyMode) {
 }
 
 for (const rawTarget of targets) {
-  const { target, project } = validateTarget(rawTarget);
-  if (isPendingFirstSyncProject(project)) {
-    console.log(
-      `Skipping target delivery for ${target.project}: ${project.tokenFile} does not exist yet. It will be created by the first plugin PR/MR.`,
-    );
-    continue;
-  }
-
+  const { target } = validateTarget(rawTarget);
   validateBuiltArtifacts(target);
   const delivery = buildDelivery(target);
   printDelivery(delivery, isApplyMode ? "apply" : "dry-run");
@@ -155,7 +147,9 @@ function validateTarget(target: TargetConfig): {
 
   const project = projectById.get(target.project);
   if (!project) {
-    throw new Error(`${target.project} does not exist in projects.config.json.`);
+    throw new Error(
+      `${target.project} does not exist in projects.config.json.`,
+    );
   }
   if (target.source !== project.outputDir) {
     throw new Error(
@@ -167,10 +161,6 @@ function validateTarget(target: TargetConfig): {
     target: target as ValidatedTarget,
     project,
   };
-}
-
-function isPendingFirstSyncProject(project: TokenProject): boolean {
-  return !fs.existsSync(path.join(rootDir, project.tokenFile));
 }
 
 function validateBuiltArtifacts(target: ValidatedTarget): void {
@@ -189,9 +179,10 @@ function buildDelivery(target: ValidatedTarget): Delivery {
     path.join(sourceDir, "manifest.json"),
   );
   const deliveryConfig = target.delivery ?? {};
+  const artifactVersion = manifest.version ?? "current";
   const branchName =
     getString(deliveryConfig.branchName) ??
-    `${getString(deliveryConfig.branchPrefix) ?? "tokens/"}${target.project}-${manifest.version}`;
+    `${getString(deliveryConfig.branchPrefix) ?? "tokens/"}${target.project}-${artifactVersion}`;
   const title =
     getString(deliveryConfig.title) ??
     `Update ${target.project} design token artifacts`;
@@ -201,7 +192,7 @@ function buildDelivery(target: ValidatedTarget): Delivery {
       "Automated delivery from `ekn-central-tokens`.",
       "",
       `- Project: \`${target.project}\``,
-      `- Artifact version: \`${manifest.version}\``,
+      `- Artifact version: \`${artifactVersion}\``,
       `- Source artifact: \`${target.source}\``,
       "",
       "The target project maintainer must review, run target CI, and merge.",
@@ -214,59 +205,10 @@ function buildDelivery(target: ValidatedTarget): Delivery {
     branchName,
     title,
     body,
-    mappings: getMappings(sourceDir, target.destination),
+    mappings: getDeliveryMappings(sourceDir, target.destination),
     reviewers: getStringArray(deliveryConfig.reviewers),
     labels: getStringArray(deliveryConfig.labels),
   };
-}
-
-function getMappings(
-  sourceDir: string,
-  destination: ValidatedTarget["destination"],
-): DeliveryMapping[] {
-  const mappings: DeliveryMapping[] = [
-    {
-      label: "css",
-      source: path.join(sourceDir, "css"),
-      destination: destination.css,
-      type: "directory",
-    },
-  ];
-
-  if (destination.html) {
-    mappings.push({
-      label: "html",
-      source: path.join(sourceDir, "html"),
-      destination: destination.html,
-      type: "directory",
-    });
-  }
-
-  if (destination.json) {
-    mappings.push({
-      label: "json",
-      source: path.join(sourceDir, "json"),
-      destination: destination.json,
-      type: "directory",
-    });
-  }
-
-  if (destination.manifest) {
-    mappings.push({
-      label: "manifest",
-      source: path.join(sourceDir, "manifest.json"),
-      destination: destination.manifest,
-      type: "file",
-    });
-  }
-
-  for (const mapping of mappings) {
-    if (!fs.existsSync(mapping.source)) {
-      throw new Error(`Missing ${mapping.label} artifact: ${mapping.source}`);
-    }
-  }
-
-  return mappings;
 }
 
 function printDelivery(delivery: Delivery, mode: "apply" | "dry-run"): void {
@@ -320,8 +262,14 @@ function createTargetMergeRequest(delivery: Delivery): void {
   for (const mapping of delivery.mappings) {
     const destination = path.join(workDir, mapping.destination);
     fs.rmSync(destination, { recursive: true, force: true });
-    fs.mkdirSync(path.dirname(destination), { recursive: true });
-    fs.cpSync(mapping.source, destination, { recursive: true });
+    if (mapping.type === "file") {
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      fs.cpSync(mapping.source, destination);
+      continue;
+    }
+
+    fs.mkdirSync(destination, { recursive: true });
+    copyArtifactsRecursively(mapping.source, destination, mapping.extension!);
   }
 
   run("git", ["add", "-A"], { cwd: workDir });
@@ -343,8 +291,7 @@ function createTargetMergeRequest(delivery: Delivery): void {
     [
       "config",
       "user.name",
-      process.env.TARGET_DELIVERY_GIT_USER_NAME ??
-        "ekn-token-delivery-bot",
+      process.env.TARGET_DELIVERY_GIT_USER_NAME ?? "ekn-token-delivery-bot",
     ],
     { cwd: workDir },
   );
@@ -462,9 +409,7 @@ function getGitHubOwnerRepo(repo: string): string {
   try {
     const url = new URL(repo);
     if (url.hostname === "github.com") {
-      const [owner, name] = url.pathname
-        .replace(/^\/|\.git$/g, "")
-        .split("/");
+      const [owner, name] = url.pathname.replace(/^\/|\.git$/g, "").split("/");
       if (owner && name) return `${owner}/${name}`;
     }
   } catch {
@@ -484,7 +429,11 @@ function assertCommand(command: string, args: string[]): void {
   }
 }
 
-function run(command: string, args: string[], options: RunOptions = {}): string {
+function run(
+  command: string,
+  args: string[],
+  options: RunOptions = {},
+): string {
   return execFileSync(command, args, {
     cwd: options.cwd ?? rootDir,
     env: {

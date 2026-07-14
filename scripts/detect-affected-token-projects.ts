@@ -1,14 +1,12 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import {
-  getProjectsConfig,
-  getTargetsConfig,
-} from "./lib/token-utils.js";
+import { getProjectsConfig, getTargetsConfig } from "./lib/token-utils.js";
 import type { ProjectsConfig, TargetsConfig } from "./lib/types.js";
 
 const rootDir = process.cwd();
 const baseRef = getArgValue("--base") ?? process.env.AFFECTED_BASE_REF;
-const headRef = getArgValue("--head") ?? process.env.AFFECTED_HEAD_REF ?? "HEAD";
+const headRef =
+  getArgValue("--head") ?? process.env.AFFECTED_HEAD_REF ?? "HEAD";
 const currentProjectsConfig = getProjectsConfig(rootDir);
 const currentTargetsConfig = getTargetsConfig(rootDir);
 const currentProjects = currentProjectsConfig.projects ?? [];
@@ -75,12 +73,6 @@ function markAffectedByPath(
     return;
   }
 
-  const blockPoolMatch = filePath.match(/^blocks\/pools\/([^/]+)\//);
-  if (blockPoolMatch?.[1]) {
-    addProjectsUsingBlockPool(blockPoolMatch[1]);
-    return;
-  }
-
   if (filePath === "projects.config.json") {
     addChangedConfigProjects(
       baseProjectsConfig.projects ?? [],
@@ -106,18 +98,6 @@ function markAffectedByPath(
   ) {
     buildAll = true;
   }
-}
-
-function addProjectsUsingBlockPool(poolName: string): void {
-  let matched = false;
-  for (const project of currentProjects) {
-    if ((project.blockPools ?? []).includes(poolName)) {
-      affectedProjectIds.add(project.id);
-      matched = true;
-    }
-  }
-
-  if (!matched) buildAll = true;
 }
 
 function addChangedConfigProjects(
@@ -229,8 +209,8 @@ function emitGithubEnv(name: string, value: string): void {
 function hasStderr(error: unknown): error is { stderr: unknown } {
   return Boolean(
     error &&
-      typeof error === "object" &&
-      "stderr" in error &&
-      (error as { stderr?: unknown }).stderr,
+    typeof error === "object" &&
+    "stderr" in error &&
+    (error as { stderr?: unknown }).stderr,
   );
 }

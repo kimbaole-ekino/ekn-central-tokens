@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - "token-definitions/**"
-      - "blocks/**"
       - "projects.config.json"
       - "targets.config.json"
       - "scripts/**"
@@ -32,7 +31,6 @@ jobs:
         if: github.event_name == 'pull_request'
         run: npm run detect:affected-projects -- --base=${{ github.event.pull_request.base.sha }} --head=${{ github.sha }}
       - run: npm run validate:tokens
-      - run: npm run check:stale-token-pr
       - run: npm run build:artifacts
       - name: Upload token artifacts
         uses: actions/upload-artifact@v4
