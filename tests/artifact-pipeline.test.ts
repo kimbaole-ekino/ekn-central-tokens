@@ -273,6 +273,145 @@ test("artifact CLI initializes its permutation limit before invoking main", () =
   );
 });
 
+test("token validation checks only the selected project's canonical file", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "tokens-validation-cli-"));
+  const project = temporaryProject(root);
+  fs.writeFileSync(
+    path.join(root, "projects.config.json"),
+    JSON.stringify({
+      projects: [
+        project,
+        {
+          id: "unrelated",
+          tokenFile: "tokens/unrelated/tokens.json",
+          outputDir: "dist/unrelated",
+        },
+      ],
+    }),
+  );
+  fs.writeFileSync(
+    path.join(root, "targets.config.json"),
+    JSON.stringify({ targets: [] }),
+  );
+
+  const result = spawnSync(
+    process.execPath,
+    [
+      path.resolve("node_modules/tsx/dist/cli.mjs"),
+      path.resolve("scripts/validate-token-projects.ts"),
+      "--project=fixture",
+    ],
+    { cwd: root, encoding: "utf8" },
+  );
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /Validated 1 token file\(s\)\./);
+});
+
+test("project configuration without tokens.json does not fail validation, build, or delivery", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "tokens-first-sync-"));
+  const project: TokenProject = {
+    id: "pending",
+    tokenFile: "tokens/pending/tokens.json",
+    outputDir: "dist/pending",
+  };
+  fs.writeFileSync(
+    path.join(root, "projects.config.json"),
+    JSON.stringify({ projects: [project] }),
+  );
+  fs.writeFileSync(
+    path.join(root, "targets.config.json"),
+    JSON.stringify({
+      targets: [
+        {
+          project: "pending",
+          repo: "https://github.com/example/pending.git",
+          branch: "main",
+          source: "dist/pending",
+          destination: { css: "src/styles/generated-tokens" },
+        },
+      ],
+    }),
+  );
+
+  for (const [script, expectedOutput] of [
+    ["validate-token-projects.ts", "Skipped 1 project(s) without tokens.json."],
+    ["build-token-artifacts.ts", "waiting for tokens/pending/tokens.json."],
+    [
+      "create-target-merge-requests.ts",
+      "No configured projects with tokens.json are ready for target delivery.",
+    ],
+  ] as const) {
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.resolve("node_modules/tsx/dist/cli.mjs"),
+        path.resolve("scripts", script),
+        "--project=pending",
+      ],
+      { cwd: root, encoding: "utf8" },
+    );
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stdout.includes(expectedOutput), true, result.stdout);
+  }
+  assert.equal(fs.existsSync(path.join(root, project.outputDir)), false);
+});
+
+test("tokens.json without project configuration is still validated", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "tokens-unregistered-"));
+  const tokenDir = path.join(root, "token-definitions/projects/unregistered");
+  fs.mkdirSync(tokenDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(tokenDir, "tokens.json"),
+    JSON.stringify(document()),
+  );
+  fs.writeFileSync(
+    path.join(root, "projects.config.json"),
+    JSON.stringify({ projects: [] }),
+  );
+  fs.writeFileSync(
+    path.join(root, "targets.config.json"),
+    JSON.stringify({ targets: [] }),
+  );
+
+  const runValidation = () =>
+    spawnSync(
+      process.execPath,
+      [
+        path.resolve("node_modules/tsx/dist/cli.mjs"),
+        path.resolve("scripts/validate-token-projects.ts"),
+      ],
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          TOKEN_PROJECTS: "",
+          TOKEN_VALIDATION_PROJECTS: "unregistered",
+        },
+      },
+    );
+
+  const validResult = runValidation();
+  assert.equal(validResult.status, 0, validResult.stderr || validResult.stdout);
+  assert.equal(
+    validResult.stdout.includes("waiting for project configuration"),
+    true,
+    validResult.stdout,
+  );
+  assert.equal(
+    validResult.stdout.includes("Validated 1 token file(s)."),
+    true,
+    validResult.stdout,
+  );
+
+  fs.writeFileSync(path.join(tokenDir, "tokens.json"), "{");
+  const invalidResult = runValidation();
+  assert.notEqual(invalidResult.status, 0);
+  assert.match(invalidResult.stderr, /failed parsing/);
+});
+
 test("one Theme Group with multiple Themes creates flat artifact paths", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "tokens-nested-groups-"));
   const tokenDocument: TokenDocument = {

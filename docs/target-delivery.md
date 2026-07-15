@@ -65,7 +65,7 @@ The generated source directory in Central. It must exactly equal the selected pr
 "source": "dist/site-a"
 ```
 
-A mismatch fails validation. Delivery also requires `<source>/manifest.json`, so running delivery before the artifact build fails clearly.
+A mismatch fails validation. When `tokens.json` exists, delivery also requires `<source>/manifest.json`, so running delivery before the artifact build fails clearly. A configured project without `tokens.json` is skipped before this manifest check.
 
 ### `destination.css`
 
@@ -162,8 +162,8 @@ Delivery reads an optional `version` from the built manifest. Central-generated 
 Build before delivery:
 
 ```sh
-npm run validate:tokens
-npm run build:artifacts
+npm run validate:tokens -- --project=site-a
+npm run build:artifacts -- --project=site-a
 ```
 
 Delivery is a dry-run by default:
@@ -201,7 +201,8 @@ GH_TOKEN=... npm run delivery:target-mr -- --project=site-a --apply
 | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | Unknown project ID                                                      | Validation fails.                                                                |
 | `source` does not match project output                                  | Validation fails.                                                                |
-| Built manifest is missing                                               | Delivery fails before planning mappings.                                         |
+| Configured project has no `tokens.json`                                 | Build and delivery skip the project successfully.                                |
+| Built manifest is missing for a synced project                          | Delivery fails before planning mappings.                                         |
 | Target branch does not exist                                            | Apply delivery fails while cloning.                                              |
 | Repository is inaccessible                                              | Apply delivery fails.                                                            |
 | Destination is absolute, contains `..`, or overlaps another destination | Validation fails.                                                                |

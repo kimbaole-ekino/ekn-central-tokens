@@ -4,13 +4,15 @@ Use these walkthroughs after reading the [project configuration reference](proje
 
 ## Add a new token project
 
-1. Create the canonical file updated by the Plugin:
+The configuration entry and canonical file can be created in either order.
+
+1. Use this canonical path in the Plugin:
 
    ```text
    token-definitions/projects/site-a/tokens.json
    ```
 
-2. Add the project to the root `projects.config.json`:
+2. Add the matching project to the root `projects.config.json`:
 
    ```json
    {
@@ -26,21 +28,26 @@ Use these walkthroughs after reading the [project configuration reference](proje
 
    Preserve other registered projects when editing the array.
 
-3. Validate configuration and canonical tokens:
+3. Until both inputs exist, Central handles either incomplete state safely:
+
+   - Configuration without `tokens.json`: validation, build, and delivery skip the project.
+   - `tokens.json` without configuration: Central validates the document but does not build or deliver it.
+
+4. When both inputs exist, validate the project:
 
    ```sh
-   npm run validate:tokens
+   npm run validate:tokens -- --project=site-a
    ```
 
-   A successful run reports the number of validated token files.
-
-4. Build artifacts:
+5. Build artifacts:
 
    ```sh
    npm run build:artifacts -- --project=site-a
    ```
 
-5. Inspect `dist/site-a/`. Verify the CSS, resolved JSON, root `manifest.json`, normalized Theme names, and expected flat or nested path structure. Remember that the next build removes and recreates this directory.
+6. Inspect `dist/site-a/`. Verify the CSS, resolved JSON, root `manifest.json`, normalized Theme names, and expected flat or nested path structure. Remember that the next build removes and recreates this directory.
+
+Do not add a placeholder token document. The Plugin creates canonical `tokens.json`; Central configuration defines its location, output, and delivery.
 
 ## Deliver a project to a target repository
 
@@ -78,7 +85,7 @@ Use these walkthroughs after reading the [project configuration reference](proje
 5. Validate and build, then run a project-specific dry-run:
 
    ```sh
-   npm run validate:tokens
+   npm run validate:tokens -- --project=site-a
    npm run build:artifacts -- --project=site-a
    npm run delivery:target-mr -- --project=site-a
    ```

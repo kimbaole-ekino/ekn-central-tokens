@@ -8,7 +8,7 @@ For build changes, review normalized output/path collision handling, transformed
 
 ## Onboarding checklist
 
-- canonical file exists and passes shared submission validation;
+- a configured project may wait for `tokens.json`; when present, the file passes shared submission validation;
 - project ID/output directory are unique and repository-relative;
 - derived permutations are at most 20;
 - target source exactly matches output directory;

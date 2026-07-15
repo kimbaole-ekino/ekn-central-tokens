@@ -31,7 +31,7 @@ export function getSelectedProjects(
   const knownProjectIds = new Set(projects.map((project) => project.id));
   for (const projectId of selectedProjectIds) {
     if (!knownProjectIds.has(projectId)) {
-      throw new Error(`Unknown token project selected for build: ${projectId}`);
+      throw new Error(`Unknown token project selected: ${projectId}`);
     }
   }
 

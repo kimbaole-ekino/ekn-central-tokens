@@ -50,9 +50,9 @@ nvm use
 npm install
 npm test
 npm run typecheck
-npm run validate:tokens
-npm run build:artifacts
-npm run delivery:target-mr
+npm run validate:tokens -- --project=site-a
+npm run build:artifacts -- --project=site-a
+npm run delivery:target-mr -- --project=site-a
 ```
 
-Delivery defaults to dry-run unless CI/apply configuration authorizes repository changes. Start with the [documentation index](docs/README.md) for architecture, config contracts, artifacts, delivery, operations, and troubleshooting.
+Omit `--project` to validate every canonical token document. Build and delivery process only projects that have both configuration and `tokens.json`. Delivery defaults to dry-run unless CI/apply configuration authorizes repository changes. Start with the [documentation index](docs/README.md) for architecture, config contracts, artifacts, delivery, operations, and troubleshooting.

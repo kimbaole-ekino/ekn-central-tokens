@@ -81,6 +81,23 @@ if (targets.length === 0) {
   );
 }
 
+const readyTargets = targets
+  .map((target) => validateTarget(target))
+  .filter(({ project }) => {
+    if (fs.existsSync(path.join(rootDir, project.tokenFile))) return true;
+    console.log(
+      `Skipping ${project.id} target delivery: waiting for ${project.tokenFile}.`,
+    );
+    return false;
+  });
+
+if (readyTargets.length === 0) {
+  console.log(
+    "No configured projects with tokens.json are ready for target delivery.",
+  );
+  process.exit(0);
+}
+
 if (isApplyMode) {
   assertCommand("git", ["--version"]);
   assertCommand("gh", ["--version"]);
@@ -91,8 +108,7 @@ if (isApplyMode) {
   }
 }
 
-for (const rawTarget of targets) {
-  const { target } = validateTarget(rawTarget);
+for (const { target } of readyTargets) {
   validateBuiltArtifacts(target);
   const delivery = buildDelivery(target);
   printDelivery(delivery, isApplyMode ? "apply" : "dry-run");

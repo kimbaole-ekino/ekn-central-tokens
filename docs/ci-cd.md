@@ -8,11 +8,11 @@
 2. runs unit and contract tests;
 3. runs TypeScript typecheck;
 4. detects affected token projects for pull requests;
-5. validates current canonical token files;
-6. builds artifacts;
+5. validates affected canonical token files, including files without project configuration;
+6. builds artifacts for registered, synced projects;
 7. uploads `dist/` as the `token-dist` workflow artifact.
 
-A green workflow proves the checked-in inputs can be validated and built. It does not prove a real target PR, deployment preview, or Figma runtime behavior.
+A green workflow proves the checked-in inputs are valid and all eligible projects can be built. An unregistered token file is validated but intentionally has no artifacts yet. It does not prove a real target PR, deployment preview, or Figma runtime behavior.
 
 ## Target delivery
 
