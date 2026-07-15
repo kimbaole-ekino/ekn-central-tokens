@@ -1,18 +1,18 @@
 # Configuration examples
 
-Use these walkthroughs after reading the [project configuration reference](project-configuration.md) and [target delivery reference](target-delivery.md).
+Read the [project configuration reference](project-configuration.md) and [target delivery reference](target-delivery.md) for all field rules.
 
-## Add a new token project
+## Add a token project
 
-The configuration entry and canonical file can be created in either order.
+The config entry and `tokens.json` can be added in either order.
 
-1. Use this canonical path in the Plugin:
+1. Use this canonical path in Token Architect:
 
    ```text
    token-definitions/projects/site-a/tokens.json
    ```
 
-2. Add the matching project to the root `projects.config.json`:
+2. Add the project to `projects.config.json`:
 
    ```json
    {
@@ -26,32 +26,27 @@ The configuration entry and canonical file can be created in either order.
    }
    ```
 
-   Preserve other registered projects when editing the array.
+   Keep all other project entries.
 
-3. Until both inputs exist, Central handles either incomplete state safely:
+3. Central handles incomplete setup safely:
 
-   - Configuration without `tokens.json`: validation, build, and delivery skip the project.
-   - `tokens.json` without configuration: Central validates the document but does not build or deliver it.
+   - Config without `tokens.json`: skip validation for that project, build, and delivery.
+   - `tokens.json` without config: validate the file, but do not build or deliver it.
 
-4. When both inputs exist, validate the project:
+4. When both files exist, run:
 
    ```sh
    npm run validate:tokens -- --project=site-a
-   ```
-
-5. Build artifacts:
-
-   ```sh
    npm run build:artifacts -- --project=site-a
    ```
 
-6. Inspect `dist/site-a/`. Verify the CSS, resolved JSON, root `manifest.json`, normalized Theme names, and expected flat or nested path structure. Remember that the next build removes and recreates this directory.
+5. Check `dist/site-a/`. Review CSS, resolved JSON, `manifest.json`, Theme names, and flat or nested paths. The next build replaces this full folder.
 
-Do not add a placeholder token document. The Plugin creates canonical `tokens.json`; Central configuration defines its location, output, and delivery.
+Do not add fake token data. Token Architect creates the canonical file. Central only sets its path, output folder, and delivery.
 
-## Deliver a project to a target repository
+## Deliver a project
 
-1. Add a target to the root `targets.config.json`:
+1. Add a target to `targets.config.json`:
 
    ```json
    {
@@ -74,15 +69,10 @@ Do not add a placeholder token document. The Plugin creates canonical `tokens.js
    }
    ```
 
-   Preserve other targets when editing the array.
-
-2. Confirm that `project` exactly matches `projects.config.json.projects[].id`.
-
-3. Confirm that `source` exactly matches that project's `outputDir`.
-
-4. Choose a `destination.css` containing generated files only. Apply delivery deletes and recreates it.
-
-5. Validate and build, then run a project-specific dry-run:
+2. Make sure `project` matches a project ID.
+3. Make sure `source` matches that project's `outputDir`.
+4. Use a CSS destination that contains generated files only. Apply mode deletes and recreates it.
+5. Run validation, build, and dry-run:
 
    ```sh
    npm run validate:tokens -- --project=site-a
@@ -90,12 +80,11 @@ Do not add a placeholder token document. The Plugin creates canonical `tokens.js
    npm run delivery:target-mr -- --project=site-a
    ```
 
-6. Review the reported repository, base branch, delivery branch, and source-to-destination mapping. Compare the manifest paths with the files under `dist/site-a/` to verify the copied layout.
-
-7. Run apply mode only after reviewing the dry-run. Supply a GitHub token with access to the target repository:
+6. Check the repository, base branch, delivery branch, and file mapping. Compare the manifest with the built files.
+7. Use apply mode only after approval:
 
    ```sh
    GH_TOKEN=... npm run delivery:target-mr -- --project=site-a --apply
    ```
 
-   Central creates or updates a pull request. The target maintainer remains responsible for review and merge.
+Central creates or updates a pull request. The target maintainer reviews and merges it.

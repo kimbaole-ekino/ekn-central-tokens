@@ -1,26 +1,25 @@
 # CI/CD operations
 
-## Pull-request validation
+## Pull-request checks
 
-`.github/workflows/token-ci.yml` runs when source tokens, configuration, scripts, tests, package metadata, or the workflow itself changes. It:
+`.github/workflows/token-ci.yml` runs when token source, config, scripts, tests, package files, or the workflow changes. It:
 
-1. installs with Node 22 and `npm ci`;
-2. runs unit and contract tests;
-3. runs TypeScript typecheck;
-4. detects affected token projects for pull requests;
-5. validates affected canonical token files, including files without project configuration;
-6. builds artifacts for registered, synced projects;
-7. uploads `dist/` as the `token-dist` workflow artifact.
+1. installs packages with Node 22 and `npm ci`;
+2. runs tests and TypeScript checks;
+3. finds affected token projects;
+4. validates affected canonical files, including files without project config;
+5. builds registered projects that have `tokens.json`;
+6. uploads `dist/` as the `token-dist` CI artifact.
 
-A green workflow proves the checked-in inputs are valid and all eligible projects can be built. An unregistered token file is validated but intentionally has no artifacts yet. It does not prove a real target PR, deployment preview, or Figma runtime behavior.
+A green run means the checked files are valid and all ready projects can build. It does not prove a real target pull request or Figma runtime behavior.
 
 ## Target delivery
 
-`.github/workflows/target-delivery.yml` runs after relevant changes reach `main`, or by manual dispatch. Push runs detect affected projects, build artifacts, and invoke delivery in apply mode. Manual dispatch can select one project and defaults to dry-run.
+`.github/workflows/target-delivery.yml` runs after related changes reach `main`, or through a manual run. A push to `main` finds affected projects, builds them, and can use apply mode. A manual run can select one project and starts as a dry-run.
 
-Apply mode requires `TARGET_REPOSITORY_TOKEN` with permission to create branches, commits, and pull requests in the configured target repository. Delivery proposes a PR; it never merges directly into the target base branch.
+Apply mode needs `TARGET_REPOSITORY_TOKEN`. The token must be able to create branches, commits, and pull requests in the target repository. Delivery never merges into the target base branch.
 
-## Local release evidence
+## Local release checks
 
 Run:
 
@@ -34,20 +33,20 @@ npm run delivery:target-mr
 npm audit
 ```
 
-The delivery command is dry-run unless apply is explicitly authorized. Keep the output from all commands in the release PR or linked CI run.
+The delivery command is a dry-run unless apply mode is clearly enabled. Add command output or a CI link to the release pull request.
 
-## Security audit handling
+## Security audit results
 
-An audit finding is not equivalent to an exploitable production issue, but it must be triaged. Record:
+For each audit issue, record:
 
-- affected direct and transitive packages;
-- whether the dependency runs only during trusted builds;
-- whether untrusted token content reaches the vulnerable API;
-- the available fixed version and compatibility impact;
-- the accepted mitigation and review date.
+- direct and indirect packages;
+- whether the package only runs during trusted builds;
+- whether token input reaches the unsafe code;
+- the fixed version and change risk;
+- the chosen safety step and next review date.
 
-Do not use `npm audit fix --force` on the release branch without rebuilding artifacts and reviewing output changes. The current `@tokens-studio/sd-transforms` upgrade path is a compatibility change and needs a dedicated test PR.
+Do not run `npm audit fix --force` on a release branch without building again and checking output changes.
 
 ## Rollback
 
-Generated files are deterministic. Roll back through a corrective PR that restores the prior canonical/config revision, rebuilds, and creates a new target PR. Do not manually patch generated CSS in the target because the next delivery replaces it.
+Restore the last good token or config state through a new pull request. Build again and create a new target pull request. Do not edit generated target CSS by hand.

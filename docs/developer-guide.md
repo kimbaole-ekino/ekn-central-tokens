@@ -2,7 +2,7 @@
 
 ## Setup
 
-Use the exact supported major:
+Use Node 22 from `.nvmrc`:
 
 ```sh
 nvm use
@@ -11,29 +11,35 @@ npm test
 npm run typecheck
 ```
 
-`.nvmrc`, `package.json`, and CI all target Node 22. Do not use a passing Node 20 run as release evidence.
+`package.json` and CI also use Node 22. A passing run on another Node version is not release proof.
 
-## Normal change loop
+## Normal change process
 
-1. Start with a failing public-behavior test.
-2. Make the smallest central change while leaving canonical semantics in the shared validator.
-3. Run focused tests, then full tests/typecheck/validation/build.
-4. Inspect generated CSS, resolved JSON, and manifest for a real configured project.
-5. Run delivery dry-run and confirm only intended CSS mappings.
-6. Update reference docs when a config, selector, path, manifest, or delivery contract changes.
+1. Add a test that shows the required behavior.
+2. Make the smallest safe Central change. Keep token rules in the shared validator.
+3. Run focused tests, then the full test, typecheck, validation, and build commands.
+4. Check CSS, resolved JSON, and the manifest for a real project.
+5. Run delivery in dry-run mode and check every CSS mapping.
+6. Update the docs when a path, selector, manifest, configuration, or delivery rule changes.
 
-## Common tasks
+## Common work
 
-To add a project, follow [project configuration](project-configuration.md). To change canonical semantics, change and publish the shared validator first, with parity tests in both repos. To add an artifact format, define whether it is central-only or target-delivered and add explicit destination validation; never infer delivery from files merely existing in `dist`.
+Use [project configuration](project-configuration.md) to add a project. Change canonical token rules in the shared validator first, publish it, and test both clients.
+
+Before adding a new artifact type, decide if it stays in Central or goes to targets. Add an exact target destination and tests. Do not deliver a file only because it exists in `dist/`.
 
 ## Validator UAT releases
 
-UAT must exercise the registry package boundary, not the adjacent workspace through a `file:` dependency or symlink. Publish the public `@eknvn/token-validator` prerelease with the `uat` dist-tag, replace Central's dependency with the exact prerelease version, run `npm install`, and commit both `package.json` and `package-lock.json`. Verify with Node 22 using `npm test`, `npm run typecheck`, and the relevant artifact build before promoting the release.
+Test the real package registry path. Publish `@eknvn/token-validator` with the agreed `uat` tag. Install that exact version in Central and commit both package files.
+
+Do not use a nearby `file:` dependency or link as release proof. Run Central tests, typecheck, and a real artifact build with Node 22.
 
 ## CSS changes
 
-Treat selectors, custom-property names, alias/static representation, and nested paths as consumer APIs. A change needs an artifact test and target coordination. Preserve simple alias relationships as `var(--target)` after transformed-name collision checks; keep JSON resolved.
+Selectors, CSS variable names, reference output, and nested paths are target APIs. Add an artifact test and tell target maintainers before changing them.
+
+Keep a simple safe reference as `var(--target)`. Keep resolved JSON fully resolved.
 
 ## Working tree safety
 
-Canonical token files may contain concurrent designer changes. Do not normalize or replace them as a side effect of config work. Generated `dist` is disposable, but project config and token definitions are reviewed source.
+Canonical files may include designer work. Do not rewrite them during an unrelated config change. `dist/` is generated and can be replaced, but configuration and token source files need review.
