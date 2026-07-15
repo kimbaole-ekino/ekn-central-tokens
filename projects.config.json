@@ -3,15 +3,12 @@
     {
       "id": "ekn-design-tokens-target",
       "tokenFile": "token-definitions/projects/ekn-design-tokens-target/tokens.json",
-      "outputDir": "dist/ekn-design-tokens-target",
-      "blockPools": ["core"]
+      "outputDir": "dist/ekn-design-tokens-target"
     },
     {
       "id": "havas-network-websites",
       "tokenFile": "token-definitions/projects/havas-network-websites/tokens.json",
-      "outputDir": "dist/havas-network-websites",
-      "themeFolders": true,
-      "blockPools": ["core"]
+      "outputDir": "dist/havas-network-websites"
     }
   ]
 }

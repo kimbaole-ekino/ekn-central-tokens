@@ -6,7 +6,6 @@ on:
       - main
     paths:
       - "token-definitions/**"
-      - "blocks/**"
       - "projects.config.json"
       - "targets.config.json"
       - "scripts/**"
