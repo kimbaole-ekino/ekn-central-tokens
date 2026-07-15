@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import { discoverTokenProjects } from "./lib/project-discovery.js";
 import { getProjectsConfig, getTargetsConfig } from "./lib/token-utils.js";
 import type { ProjectsConfig, TargetsConfig } from "./lib/types.js";
 
@@ -11,6 +12,9 @@ const currentProjectsConfig = getProjectsConfig(rootDir);
 const currentTargetsConfig = getTargetsConfig(rootDir);
 const currentProjects = currentProjectsConfig.projects ?? [];
 const currentProjectIds = new Set(currentProjects.map((project) => project.id));
+const discoveredProjectIds = new Set(
+  discoverTokenProjects(rootDir).map((project) => project.id),
+);
 const affectedProjectIds = new Set<string>();
 let buildAll = false;
 
@@ -52,14 +56,26 @@ const selectedProjectIds = buildAll
   : [...affectedProjectIds].filter((projectId) =>
       currentProjectIds.has(projectId),
     );
+const validationProjectIds = buildAll
+  ? [...new Set([...currentProjectIds, ...discoveredProjectIds])]
+  : [...affectedProjectIds].filter(
+      (projectId) =>
+        currentProjectIds.has(projectId) || discoveredProjectIds.has(projectId),
+    );
 
 emitGithubEnv("TOKEN_PROJECTS", selectedProjectIds.join(","));
+emitGithubEnv("TOKEN_VALIDATION_PROJECTS", validationProjectIds.join(","));
 emitGithubEnv("TARGET_DELIVERY_PROJECTS", selectedProjectIds.join(","));
 
 console.log(
   selectedProjectIds.length > 0
     ? `Affected token projects: ${selectedProjectIds.join(", ")}`
     : "Affected token projects: none",
+);
+console.log(
+  validationProjectIds.length > 0
+    ? `Token projects selected for validation: ${validationProjectIds.join(", ")}`
+    : "Token projects selected for validation: none",
 );
 
 function markAffectedByPath(

@@ -35,7 +35,13 @@ async function main(): Promise<void> {
   const projects = getSelectedProjects(config.projects ?? [], selected);
   if (selected && projects.length === 0)
     console.log("No token projects selected for artifact build.");
-  for (const project of projects) await buildProject(project, rootDir);
+  for (const project of projects) {
+    if (!fs.existsSync(path.join(rootDir, project.tokenFile))) {
+      console.log(`Skipping ${project.id}: waiting for ${project.tokenFile}.`);
+      continue;
+    }
+    await buildProject(project, rootDir);
+  }
 }
 
 export async function buildProject(

@@ -7,6 +7,8 @@ import {
   readTokenDocument,
   validateTokenDocument,
 } from "./lib/token-utils.js";
+import { getSelectedProjectIds } from "./lib/project-selection.js";
+import { discoverTokenProjects } from "./lib/project-discovery.js";
 import type {
   ProjectsConfig,
   TargetConfig,
@@ -31,17 +33,78 @@ function main(): void {
   validateProjectsConfig(config, projectIds);
   validateTargetsConfig(targetsConfig, config, projectIds);
 
-  for (const project of config.projects ?? []) {
+  const configuredProjects = config.projects ?? [];
+  const configuredTokenFiles = new Set(
+    configuredProjects.map((project) => normalizeRepoPath(project.tokenFile)),
+  );
+  const unregisteredProjects = discoverTokenProjects(rootDir).filter(
+    (project) =>
+      !configuredTokenFiles.has(normalizeRepoPath(project.tokenFile)),
+  );
+  const selectedProjectIds = getValidationSelectedProjectIds();
+  if (selectedProjectIds) {
+    const knownProjectIds = new Set([
+      ...configuredProjects.map((project) => project.id),
+      ...unregisteredProjects.map((project) => project.id),
+    ]);
+    for (const projectId of selectedProjectIds) {
+      if (!knownProjectIds.has(projectId)) {
+        throw new Error(`Unknown token project selected: ${projectId}`);
+      }
+    }
+  }
+  const selectedProjects = configuredProjects.filter(
+    (project) => !selectedProjectIds || selectedProjectIds.has(project.id),
+  );
+  const selectedUnregisteredProjects = unregisteredProjects.filter(
+    (project) => !selectedProjectIds || selectedProjectIds.has(project.id),
+  );
+  let missingTokenFiles = 0;
+  for (const project of selectedProjects) {
     const tokenPath = path.join(rootDir, project.tokenFile);
     if (!fs.existsSync(tokenPath)) {
-      throw new Error(`${project.id}: ${project.tokenFile} does not exist.`);
+      console.log(`Skipping ${project.id}: waiting for ${project.tokenFile}.`);
+      missingTokenFiles += 1;
+      continue;
     }
     const tokens = readTokenDocument(tokenPath);
     validateTokenDocument(tokens, project.tokenFile);
     validatedTokenFiles += 1;
   }
 
+  for (const project of selectedUnregisteredProjects) {
+    const tokenPath = path.join(rootDir, project.tokenFile);
+    const tokens = readTokenDocument(tokenPath);
+    validateTokenDocument(tokens, project.tokenFile);
+    validatedTokenFiles += 1;
+    console.log(
+      `Validated ${project.tokenFile}; waiting for project configuration.`,
+    );
+  }
+
   console.log(`Validated ${validatedTokenFiles} token file(s).`);
+  if (missingTokenFiles > 0) {
+    console.log(`Skipped ${missingTokenFiles} project(s) without tokens.json.`);
+  }
+  if (selectedUnregisteredProjects.length > 0) {
+    console.log(
+      `${selectedUnregisteredProjects.length} token file(s) without project configuration.`,
+    );
+  }
+}
+
+function getValidationSelectedProjectIds(): Set<string> | null {
+  if (!("TOKEN_VALIDATION_PROJECTS" in process.env)) {
+    return getSelectedProjectIds();
+  }
+  return getSelectedProjectIds(process.argv.slice(2), {
+    ...process.env,
+    TOKEN_PROJECTS: process.env.TOKEN_VALIDATION_PROJECTS,
+  });
+}
+
+function normalizeRepoPath(value: string): string {
+  return value.replace(/\\/g, "/").replace(/^\.\//, "");
 }
 
 export function validateProjectsConfig(
