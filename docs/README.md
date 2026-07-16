@@ -5,7 +5,7 @@ These guides describe the current Central pipeline. They also explain how Centra
 - [Architecture](architecture.md) — owners, main steps, and safety rules.
 - [Project configuration](project-configuration.md) — all fields in `projects.config.json`.
 - [Configuration examples](configuration-examples.md) — steps to add and deliver a project.
-- [Theme contexts](theme-combinations.md) — Theme Groups, combinations, order, and the build limit.
+- [Theme contexts](theme-combinations.md) — Theme Groups, combinations, and order.
 - [Nested artifacts](nested-artifacts.md) — output names, paths, selectors, JSON, and the manifest.
 - [Artifact contract](artifact-contract.md) — the files and CSS rules used by targets.
 - [Target delivery](target-delivery.md) — all fields in `targets.config.json` and the delivery process.

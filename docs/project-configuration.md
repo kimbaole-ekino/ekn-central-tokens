@@ -18,7 +18,7 @@
 
 The top-level `projects` value must be an array. Each project allows only the three fields shown above. Extra fields fail validation.
 
-Theme definitions, Set order, Theme combinations, and limits come from canonical `tokens.json`. Do not add them here.
+Theme definitions, Set order, and Theme combinations come from canonical `tokens.json`. Do not add them here.
 
 ## Incomplete project setup
 

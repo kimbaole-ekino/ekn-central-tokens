@@ -87,7 +87,7 @@ function readTree(root: string, prefix = ""): Record<string, string> {
 
 test("Theme contexts and group order are derived from tokens.json", () => {
   assert.deepEqual(
-    derivedContexts(document(), "fixture").map((context) =>
+    derivedContexts(document()).map((context) =>
       context.themes.map((theme) => theme.id),
     ),
     [
@@ -110,7 +110,7 @@ test("project config rejects fields outside the current schema", () => {
   );
 });
 
-test("derived Theme permutations have a fixed safety ceiling", () => {
+test("derived Theme permutations do not have a fixed ceiling", () => {
   const manyThemes: TokenDocument = {
     base: { number: { type: "number", value: 1 } },
     $themes: Array.from({ length: 5 }, (_, groupIndex) =>
@@ -123,9 +123,15 @@ test("derived Theme permutations have a fixed safety ceiling", () => {
     ).flat(),
     $metadata: { tokenSetOrder: ["base"] },
   };
-  assert.throws(
-    () => derivedContexts(manyThemes, "fixture"),
-    /fixture.*20.*Theme permutations/,
+  const contexts = derivedContexts(manyThemes);
+  assert.equal(contexts.length, 32);
+  assert.deepEqual(
+    contexts[0]?.themes.map((theme) => theme.id),
+    ["g0-a", "g1-a", "g2-a", "g3-a", "g4-a"],
+  );
+  assert.deepEqual(
+    contexts.at(-1)?.themes.map((theme) => theme.id),
+    ["g0-b", "g1-b", "g2-b", "g3-b", "g4-b"],
   );
 });
 
@@ -251,7 +257,7 @@ test("artifact files and manifest are deterministic and remain inside the projec
   );
 });
 
-test("artifact CLI initializes its permutation limit before invoking main", () => {
+test("artifact CLI builds a configured project", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "tokens-artifact-cli-"));
   const project = temporaryProject(root);
   fs.writeFileSync(

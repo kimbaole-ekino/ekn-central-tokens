@@ -4,7 +4,7 @@
 
 Token Architect edits canonical `tokens.json`. Central reads that file and builds artifacts. Target apps use delivered CSS.
 
-`@eknvn/token-validator` is the shared authority for Token Set order, Theme states, references, and effective values. Central does not create a second token resolver. It owns project selection, safe paths, Theme combination limits, output names, collision checks, manifests, and delivery plans.
+`@eknvn/token-validator` is the shared authority for Token Set order, Theme states, references, and effective values. Central does not create a second token resolver. It owns project selection, safe paths, Theme combination generation, output names, collision checks, manifests, and delivery plans.
 
 ## Build steps
 
@@ -21,7 +21,7 @@ One Theme Group creates flat files. Several Theme Groups create nested paths fro
 
 ## Safety rules
 
-Central stops on missing required files, unsafe paths, duplicate project IDs, invalid token data, too many Theme combinations, output path conflicts, CSS name conflicts, missing manifest entries, or overlapping target folders.
+Central stops on missing required files, unsafe paths, duplicate project IDs, invalid token data, output path conflicts, CSS name conflicts, missing manifest entries, or overlapping target folders.
 
 The build only removes and recreates a checked project output folder. Delivery only copies file types that have a target mapping.
 

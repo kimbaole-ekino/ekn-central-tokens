@@ -23,8 +23,6 @@ import type {
 } from "./lib/types.js";
 import { buildEffectiveGraphWithStyleDictionary } from "./lib/style-dictionary.js";
 
-const MAX_THEME_PERMUTATIONS = 20;
-
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url)
   await main();
 
@@ -64,7 +62,7 @@ export async function buildProject(
     );
   fs.rmSync(outputDir, { recursive: true, force: true });
   fs.mkdirSync(outputDir, { recursive: true });
-  const contexts = derivedContexts(document, project.id);
+  const contexts = derivedContexts(document);
   const artifactPaths = new Set<string>();
   const manifest: BuildManifest = { projectId: project.id, outputs: {} };
   for (const context of contexts) {
@@ -135,18 +133,8 @@ export function getArtifactBasePath(
 
 export function derivedContexts(
   document: TokenDocument,
-  projectId: string,
 ): EffectiveThemeContext[] {
-  try {
-    return resolveThemePermutations(document, {
-      maxPermutations: MAX_THEME_PERMUTATIONS,
-    });
-  } catch (error) {
-    const detail = error instanceof Error ? ` ${error.message}` : "";
-    throw new Error(
-      `${projectId} exceeds the internal limit of ${MAX_THEME_PERMUTATIONS} Theme permutations derived from tokens.json.${detail}`,
-    );
-  }
+  return resolveThemePermutations(document);
 }
 export function normalizeOutputId(value: string): string {
   const result = value
