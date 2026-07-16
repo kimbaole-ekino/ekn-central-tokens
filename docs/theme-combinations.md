@@ -6,10 +6,6 @@ One group with Light and Dark creates two contexts. Two groups with two Themes e
 
 Group order is stable. Central scans `$themes` from top to bottom and uses the first appearance of each group. Theme lists, output IDs, paths, and manifest data all use this order.
 
-## Build limit
-
-Central allows at most 20 Theme combinations. This limit is not a project setting. If a document creates more, the build stops before writing artifacts and shows the project ID and limit.
-
 ## Validation
 
 The shared validator rejects missing or duplicate Theme IDs, invalid groups, invalid Set states, and invalid contexts. Stable Theme IDs provide identity. Display names provide output names and are checked for path conflicts.

@@ -12,7 +12,6 @@ Check that:
 
 - a present `tokens.json` passes shared submission validation;
 - project ID and output folder are unique and safe;
-- the document creates no more than 20 Theme combinations;
 - target `source` is the same as project `outputDir`;
 - target destinations do not overlap;
 - two builds create the same output tree;
