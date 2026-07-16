@@ -2,77 +2,76 @@
 
 ## Purpose
 
-The central build produces evidence for maintainers and a CSS runtime contract for targets. The presence of a file in `dist/` does not automatically make it a target deliverable.
+Central builds files for review and target use. A file in `dist/` is not delivered unless `targets.config.json` maps it.
 
-## Central artifact tree
+## Central output tree
 
-For each project and derived Theme context:
+For one Theme Group:
 
 ```text
-dist/{project-id}/
-  {theme-slug}.css
-  {theme-slug}.json
+dist/<project-id>/
+  <theme>.css
+  <theme>.json
   manifest.json
 ```
 
-With the current one-group Light/Dark fixtures, the output is:
+Example:
 
 ```text
-dist/{project-id}/light.css
-dist/{project-id}/light.json
-dist/{project-id}/dark.css
-dist/{project-id}/dark.json
-dist/{project-id}/manifest.json
+dist/site-a/light.css
+dist/site-a/light.json
+dist/site-a/dark.css
+dist/site-a/dark.json
+dist/site-a/manifest.json
 ```
 
-The group folder is omitted when the document has exactly one Theme Group. Documents with multiple Theme Groups retain their existing nested paths. Final artifact paths are deterministic and collision-checked after normalization.
+For several Theme Groups, selected Theme names form nested paths:
 
-## CSS selector contract
+```text
+dist/site-a/creative/react/light.css
+dist/site-a/creative/react/light.json
+```
 
-Every generated scheme file supports both ownership strategies:
+Final paths are stable and checked for conflicts after name cleanup.
+
+## CSS selectors
+
+Each CSS file supports a scheme on the document root and on a smaller block:
 
 ```css
 :root[data-color-scheme="light"],
 [data-color-scheme="light"] {
-  --color-background: ...;
+  --color-background: #ffffff;
 }
 ```
 
-The first selector supports a scheme placed on `<html>`. The second supports a scheme placed on a page block, preview, or component boundary. Central provides both forms; each target must define which element owns the attribute.
+The target app decides which element owns `data-color-scheme`.
 
-## Alias contract
+## CSS references
 
-A simple direct canonical alias remains a CSS relationship when both declarations are emitted safely:
+A simple direct token reference stays linked when both CSS variables are safe:
 
 ```css
 --color-primary: #0055ff;
 --button-background: var(--color-primary);
 ```
 
-Resolved JSON contains the final value. Composite values, embedded aliases, unsupported relationships, or missing emitted targets are written as resolved literals instead of unsafe `var()` expressions.
+Resolved JSON stores the final value. Central writes a fixed value for complex, embedded, unsupported, or unsafe references.
 
-## Manifest role
+## Manifest
 
-`manifest.json` records generated context IDs, Theme identity, and artifact paths. It is central build evidence and input to delivery planning. It is not an application runtime dependency.
+`manifest.json` records output IDs, selected Themes, and file paths. Central uses it for review and delivery planning. Target apps do not need it at runtime.
 
 ## Delivery boundary
 
-Current target entries declare only `destination.css`. Therefore:
+Current targets have only `destination.css`. Therefore:
 
-- CSS files are recursively copied while preserving nested paths;
+- CSS is copied with its nested paths;
 - resolved JSON is not copied;
-- `manifest.json` is not copied;
-- deleting `destination.json` and `destination.manifest` is the complete CSS-only configuration change.
+- `manifest.json` is not copied.
 
-A target requiring another format must add an explicit destination and tests. Do not infer delivery from extension alone.
+Add an exact destination and tests before delivering another format.
 
-## Breaking changes
+## Changes that need target review
 
-The following require target coordination and contract tests:
-
-- selector changes;
-- custom-property naming changes;
-- group/theme path normalization changes;
-- alias-to-literal behavior changes;
-- destination layout changes;
-- removing or renaming a generated scheme.
+Coordinate with target maintainers when changing selectors, CSS variable names, Theme path rules, reference output, delivery folders, or generated scheme names.

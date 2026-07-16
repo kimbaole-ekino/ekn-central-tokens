@@ -1,17 +1,19 @@
-# Theme contexts and permutations
+# Theme contexts and combinations
 
-Central derives contexts entirely from canonical `$themes`. For each distinct group, it chooses exactly one Theme and builds the Cartesian product. A one-group Light/Dark document creates two contexts. Two groups with two Themes each create four.
+Central reads Theme Groups from canonical `$themes`. It selects one Theme from each group and builds every valid combination.
 
-Group order is deterministic: scan `$themes` from top to bottom and retain the first appearance of each group. Context Theme lists, output IDs, nested path segments, and manifest Theme arrays all use this order.
+One group with Light and Dark creates two contexts. Two groups with two Themes each create four contexts.
 
-## Safety ceiling
+Group order is stable. Central scans `$themes` from top to bottom and uses the first appearance of each group. Theme lists, output IDs, paths, and manifest data all use this order.
 
-The internal `MAX_THEME_PERMUTATIONS` is 20. It is deliberately not configurable per project. Exceeding it fails the build with the project ID and limit before artifacts are generated. This catches accidental combinatorial growth while keeping design ownership in the canonical file.
+## Build limit
 
-## Canonical validation
+Central allows at most 20 Theme combinations. This limit is not a project setting. If a document creates more, the build stops before writing artifacts and shows the project ID and limit.
 
-The shared validator rejects missing/duplicate Theme IDs, invalid groups or Set states, multiple choices for one group in an active context, and contexts that cannot resolve. Stable Theme IDs drive identity; display names drive normalized artifact names and are separately checked for path collisions.
+## Validation
 
-## Plugin feature flag versus central capability
+The shared validator rejects missing or duplicate Theme IDs, invalid groups, invalid Set states, and invalid contexts. Stable Theme IDs provide identity. Display names provide output names and are checked for path conflicts.
 
-Token Architect currently has `ENABLE_THEME_GROUP = false`, so designers normally author a single `Default` group and one active Theme. Central remains group-capable because the canonical schema is group-capable and existing documents may contain multiple groups. This does not justify restoring project-level Theme configuration.
+## Current Plugin behavior
+
+Token Architect currently has `ENABLE_THEME_GROUP = false`. Designers normally create Themes in one hidden `Default` group and use one active Theme. Central still supports valid canonical files with several groups.

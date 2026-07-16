@@ -1,8 +1,8 @@
 # Target delivery configuration reference
 
-`targets.config.json` defines where Central delivers generated artifacts after building a registered project. It is read from the repository root. Current targets normally configure CSS only.
+`targets.config.json` tells Central where to send built files. It is stored at the Central repository root. Current targets normally receive CSS only.
 
-## Complete example
+## Full example
 
 ```json
 {
@@ -25,51 +25,53 @@
 }
 ```
 
-The top-level `targets` field is required and must be an array. Target, destination, and delivery objects accept only the fields documented below; extra fields fail validation.
+The top-level `targets` value must be an array. Target, destination, and delivery objects allow only the fields below. Extra fields fail validation.
 
 ## Required target fields
 
 ### `project`
 
-References `projects.config.json.projects[].id` and must match an existing ID exactly. An unknown project fails validation.
+The exact project ID from `projects.config.json`:
 
 ```json
 "project": "site-a"
 ```
 
+An unknown project fails validation.
+
 ### `repo`
 
-The target Git repository that receives generated files. It must be a non-empty string and accessible to the GitHub CLI and CI credentials used in apply mode. GitHub `owner/repo`, HTTPS, and SSH forms are accepted by delivery; authenticated push setup requires a `github.com` repository.
+The target Git repository. GitHub `owner/repo`, HTTPS, and SSH forms are accepted.
 
 ```json
 "repo": "https://github.com/example/site-a.git"
 ```
 
-An inaccessible repository, invalid GitHub location, or insufficient token permission fails delivery while cloning, configuring the authenticated remote, pushing, or creating the pull request.
+Apply mode needs access to clone, push, and open a pull request. A wrong repository or missing access fails delivery.
 
 ### `branch`
 
-The existing base branch in the target repository.
+The target base branch:
 
 ```json
 "branch": "main"
 ```
 
-Central checks out a separate delivery branch and opens a pull request into this branch. It never commits generated files directly to the base branch. A missing branch fails delivery when the repository is cloned.
+Central creates a separate delivery branch and opens a pull request to this branch. It never commits to the base branch.
 
 ### `source`
 
-The generated source directory in Central. It must exactly equal the selected project's `outputDir`.
+The Central build folder. It must exactly match the project's `outputDir`.
 
 ```json
 "source": "dist/site-a"
 ```
 
-A mismatch fails validation. When `tokens.json` exists, delivery also requires `<source>/manifest.json`, so running delivery before the artifact build fails clearly. A configured project without `tokens.json` is skipped before this manifest check.
+For a ready project, delivery needs `<source>/manifest.json`. Build before delivery. A project without `tokens.json` is skipped before this check.
 
 ### `destination.css`
 
-The repository-relative destination directory inside the target repository. It cannot be absolute or contain `..`.
+The target folder for generated CSS:
 
 ```json
 "destination": {
@@ -77,38 +79,23 @@ The repository-relative destination directory inside the target repository. It c
 }
 ```
 
-In apply mode, Central removes the entire configured destination before copying generated CSS. The directory must contain generated files only. Do not place manual CSS, application source, or any file that must survive delivery inside it.
+The path must be relative and cannot contain `..`. In apply mode, Central deletes and recreates the full folder. Keep generated files only.
 
-Central recursively copies `.css` files and preserves paths relative to `source`:
-
-```text
-One Theme Group
-
-Central: dist/site-a/site-a-light.css
-Target:  src/styles/generated-tokens/site-a-light.css
-
-Multiple Theme Groups
-
-Central: dist/site-a/brand/light.css
-Target:  src/styles/generated-tokens/brand/light.css
-```
-
-A longer destination adds folders before the artifact structure:
-
-```json
-"css": "src/styles/tokens/havas"
-```
+Central copies `.css` files and keeps paths under `source`:
 
 ```text
-src/styles/tokens/havas/site-a-light.css
-src/styles/tokens/havas/brand/light.css
+Central: dist/site-a/light.css
+Target:  src/styles/generated-tokens/light.css
+
+Central: dist/site-a/creative/react/light.css
+Target:  src/styles/generated-tokens/creative/react/light.css
 ```
 
 ## Optional destination fields
 
 ### `destination.json`
 
-Optional repository-relative directory for resolved JSON. When present, Central removes that destination and recursively copies generated `.json` files except `manifest.json`, preserving relative paths. When omitted, resolved JSON remains in Central.
+An optional folder for resolved JSON. Central deletes and recreates it, then copies `.json` files except `manifest.json`.
 
 ```json
 "json": "src/generated-tokens/json"
@@ -116,100 +103,82 @@ Optional repository-relative directory for resolved JSON. When present, Central 
 
 ### `destination.manifest`
 
-Optional repository-relative file path for the project `manifest.json`. Central removes/replaces that configured path during apply delivery. When omitted, the manifest remains in Central.
+An optional file path for the project manifest:
 
 ```json
 "manifest": "src/generated-tokens/manifest.json"
 ```
 
-CSS is required; JSON and manifest delivery are optional. Destinations on the same repository and base branch cannot be identical or nested inside one another, including destinations belonging to different target entries. Conflicts fail validation.
+CSS is required. JSON and manifest delivery are optional. Destinations for the same repository and branch cannot be the same or inside one another. Overlap fails validation.
 
 ## Optional `delivery` fields
 
-The entire `delivery` object is optional. Omitting it uses GitHub delivery with the defaults below.
+The full `delivery` object is optional. These fields are available:
 
-Keep `provider` in explicit configurations so provider intent is visible and another provider can be added without inference. Only GitHub is implemented today; GitLab delivery is not implemented yet.
+| Field          | Default                                   | Rule                                                          |
+| -------------- | ----------------------------------------- | ------------------------------------------------------------- |
+| `provider`     | `github`                                  | Only `github` is implemented. Other values fail.              |
+| `branchPrefix` | `tokens/`                                 | Must be a non-empty string. Ignored when `branchName` is set. |
+| `branchName`   | Generated                                 | A non-empty fixed delivery branch. Replaces `branchPrefix`.   |
+| `title`        | `Update <project> design token artifacts` | Must be a non-empty string.                                   |
+| `body`         | Generated review text                     | Must be a non-empty string.                                   |
+| `reviewers`    | `[]`                                      | Must contain non-empty GitHub names.                          |
+| `labels`       | `[]`                                      | Must contain non-empty GitHub label names.                    |
 
-| Field          | Required | Default                                              | Valid example                                 | Invalid value                                                                                                                                    |
-| -------------- | -------- | ---------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `provider`     | Optional | `github`                                             | `"github"`                                    | Any other value fails validation because only GitHub is implemented.                                                                             |
-| `branchPrefix` | Optional | `"tokens/"`                                          | `"design-tokens/"`                            | Empty or non-string values fail validation. Ignored when `branchName` is set.                                                                    |
-| `branchName`   | Optional | Generated from prefix, project, and manifest version | `"tokens/site-a-release"`                     | Empty or non-string values fail validation. Overrides `branchPrefix`.                                                                            |
-| `title`        | Optional | `Update <project> design token artifacts`            | `"Update Site A tokens"`                      | Empty or non-string values fail validation.                                                                                                      |
-| `body`         | Optional | Generated delivery summary and review instruction    | `"Generated token update.\n\nPlease review."` | Empty or non-string values fail validation.                                                                                                      |
-| `reviewers`    | Optional | `[]`                                                 | `["octocat", "design-system"]`                | Must be an array of non-empty strings; invalid configuration fails validation. GitHub rejects unknown or unauthorized reviewers during PR setup. |
-| `labels`       | Optional | `[]`                                                 | `["design-tokens", "automated"]`              | Must be an array of non-empty strings; invalid configuration fails validation. GitHub rejects unavailable labels during PR setup.                |
+The normal generated branch is:
 
-With the current manifests, which have no `version`, this configuration:
-
-```json
-{
-  "provider": "github",
-  "branchPrefix": "tokens/"
-}
+```text
+<branchPrefix><project>-<manifest-version>
 ```
 
-generates:
+Current Central manifests have no version, so `current` is used:
 
 ```text
 tokens/site-a-current
 ```
 
-Delivery reads an optional `version` from the built manifest. Central-generated manifests currently omit it, so the fallback is `current`. If a supplied manifest contains the field, its value replaces `current`. A configured `branchName` always takes precedence.
+GitHub may reject a reviewer or label that does not exist even when the config shape is valid.
 
-## Dry-run and apply
+## Dry-run and apply mode
 
-Build before delivery:
+Build first:
 
 ```sh
 npm run validate:tokens -- --project=site-a
 npm run build:artifacts -- --project=site-a
 ```
 
-Delivery is a dry-run by default:
-
-```sh
-npm run delivery:target-mr
-```
-
-Select one project when needed:
+Dry-run is the default:
 
 ```sh
 npm run delivery:target-mr -- --project=site-a
 ```
 
-The dry-run validates built manifests and prints the mode, repository, base branch, generated delivery branch, source, title, and root artifact mapping. It does not clone, copy, push, or open a pull request. Example mapping:
+It checks the manifest and prints the mode, repository, base branch, delivery branch, title, and file mappings. It does not clone, copy, push, or open a pull request.
 
-```text
-Mode: dry-run
-Delivery branch: tokens/site-a-current
-Artifact mappings:
-- dist/site-a -> src/styles/generated-tokens
-```
-
-After reviewing the build and dry-run, apply with GitHub credentials that can clone, push, and create pull requests:
+After approval, run apply mode with a GitHub token:
 
 ```sh
 GH_TOKEN=... npm run delivery:target-mr -- --project=site-a --apply
 ```
 
-`GITHUB_TOKEN` is also accepted. CI normally supplies the credential and apply flag. Apply mode clones the base branch, recreates configured destinations, commits changes on the delivery branch, force-pushes with lease, and creates or updates the pull request.
+`GITHUB_TOKEN` also works. Apply mode clones the target, recreates listed destinations, commits changes, force-pushes with lease, and creates or updates the pull request.
 
-## Validation and troubleshooting
+## Common problems
 
-| Problem                                                                 | Expected result                                                                  |
-| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Unknown project ID                                                      | Validation fails.                                                                |
-| `source` does not match project output                                  | Validation fails.                                                                |
-| Configured project has no `tokens.json`                                 | Build and delivery skip the project successfully.                                |
-| Built manifest is missing for a synced project                          | Delivery fails before planning mappings.                                         |
-| Target branch does not exist                                            | Apply delivery fails while cloning.                                              |
-| Repository is inaccessible                                              | Apply delivery fails.                                                            |
-| Destination is absolute, contains `..`, or overlaps another destination | Validation fails.                                                                |
-| Destination contains manual files                                       | Files may be removed during apply delivery.                                      |
-| Invalid reviewer or label configuration                                 | Validation fails; valid-looking but unavailable GitHub values may fail PR setup. |
-| Provider other than GitHub                                              | Validation fails clearly; it does not fall back to GitHub.                       |
-| Missing apply credential                                                | Apply delivery fails before cloning.                                             |
-| Extra target, destination, or delivery field                            | Validation fails.                                                                |
+| Problem                                   | Result                              |
+| ----------------------------------------- | ----------------------------------- |
+| Unknown project ID                        | Validation fails.                   |
+| Source does not match project output      | Validation fails.                   |
+| Project has no `tokens.json`              | Build and delivery skip it.         |
+| Manifest is missing                       | Delivery fails before planning.     |
+| Target branch is missing                  | Apply mode fails during clone.      |
+| Repository cannot be opened               | Apply mode fails.                   |
+| Destination is unsafe or overlaps another | Validation fails.                   |
+| Destination has manual files              | Apply mode may delete them.         |
+| Provider is not GitHub                    | Validation fails.                   |
+| Apply token is missing                    | Apply mode fails before clone.      |
+| Reviewer or label is not available        | GitHub pull-request setup may fail. |
+| Extra config field                        | Validation fails.                   |
 
-See [Configuration examples](configuration-examples.md) for complete project and target setup walkthroughs.
+See [Configuration examples](configuration-examples.md) for setup steps.

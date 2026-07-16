@@ -1,26 +1,34 @@
 # Maintainer guide
 
-## Review by contract
+## Review the contract
 
-For canonical changes, inspect stable Theme IDs, Set order, statuses, aliases, permutation count, and shared submission diagnostics. For config changes, require only `id`, `tokenFile`, and `outputDir`; reject attempts to reintroduce project-owned Theme combinations/order/limits.
+For token changes, check stable Theme IDs, Set order, Set states, references, and the number of Theme combinations. Project configuration must contain only `id`, `tokenFile`, and `outputDir`. Theme setup does not belong there.
 
-For build changes, review normalized output/path collision handling, transformed CSS name collisions, selectors, alias preservation, deterministic JSON, and manifest shape. For delivery changes, verify repository/branch/source/destination safety and that current targets map CSS only.
+For build changes, check output path conflicts, CSS name conflicts, selectors, reference output, stable JSON, and manifest data. For delivery changes, check the target repository, branch, source, safe destinations, and listed file types.
 
-## Onboarding checklist
+## Add a project
 
-- a configured project may wait for `tokens.json`; when present, the file passes shared submission validation;
-- project ID/output directory are unique and repository-relative;
-- derived permutations are at most 20;
-- target source exactly matches output directory;
-- CSS destination does not overlap another target mapping;
-- two consecutive builds produce identical trees;
-- dry-run lists only intended CSS paths;
-- target maintainers know how to select `data-color-scheme` and review the PR.
+Check that:
 
-## Release evidence
+- a present `tokens.json` passes shared submission validation;
+- project ID and output folder are unique and safe;
+- the document creates no more than 20 Theme combinations;
+- target `source` is the same as project `outputDir`;
+- target destinations do not overlap;
+- two builds create the same output tree;
+- dry-run shows only expected files;
+- target maintainers understand `data-color-scheme` and the pull-request process.
 
-Run under Node 22: tests, typecheck, token validation, artifact build, and delivery dry-run. Retain CI logs plus central JSON/manifest artifacts long enough to diagnose a target issue. A green narrow test is not enough for a selector, manifest, or delivery-contract change.
+A registered project may wait for its first `tokens.json`. Central skips it until the file exists.
 
-## Incident response
+## Release proof
 
-Stop delivery when artifacts are ambiguous or the wrong target mapping appears. Use the manifest to identify the context, resolved JSON to verify the effective value, CSS to verify representation, and shared diagnostics/provenance to trace the canonical source. Fix canonical input or central code, rebuild, and open a new reviewed target change; do not hand-edit delivered CSS.
+Use Node 22. Run tests, typecheck, token validation, artifact build, and delivery dry-run. Keep CI logs and Central artifacts long enough to investigate target problems.
+
+A small green test is not enough for a change to selectors, paths, manifests, or delivery.
+
+## Incidents and recovery
+
+Stop delivery if output or mappings are unclear. Find the owning canonical or build change. Fix it through a reviewed pull request, rebuild, and create a new target delivery.
+
+Do not patch generated target CSS by hand. The next delivery replaces it.

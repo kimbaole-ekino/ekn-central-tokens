@@ -1,36 +1,42 @@
 # Nested artifacts
 
-Each Theme context produces CSS and resolved JSON; the project produces one root `manifest.json`.
+Central builds one output for each valid Theme context.
 
 ## Paths
 
-For exactly one group, output is `<theme-slug>.css` and `.json`, for example `light.css`; the group name is omitted. For multiple groups, the existing nested structure is preserved: ordered Theme names become path segments and the final name is the filename, such as `creative/react/dark.css`.
+One Theme Group creates flat files:
 
-The output ID joins ordered Theme names with hyphens (`creative-react-dark`). Names are Unicode-normalized, non-alphanumeric runs become hyphens, and the value is lowercased. Empty and unsafe names fail the build. Two contexts fail only when their case-insensitive normalized final artifact paths collide. Identical output IDs and CSS selectors are allowed when the artifact paths differ; the manifest uses the artifact base path to disambiguate the repeated key.
+```text
+dist/<project>/<theme>.css
+dist/<project>/<theme>.json
+```
 
-Theme Groups provide artifact-file isolation, not CSS runtime isolation.
+Several Theme Groups create nested paths. Theme Group order follows the first appearance of each group in `$themes`:
 
-CSS files from different groups may contain the same data-color-scheme
-selector. Consumers should normally import only the required group. If files
-from multiple groups are loaded into the same document, the consuming
-application is responsible for CSS cascade and precedence.
+```text
+dist/<project>/<theme-1>/<theme-2>.css
+dist/<project>/<theme-1>/<theme-2>.json
+```
+
+The last selected Theme becomes the filename. Earlier selected Themes become folders. Group names are not used in the path.
+
+Central checks the final path after names are cleaned. Two contexts may have the same selector or output ID when their final paths are different.
 
 ## CSS
 
-Every file scopes variables to both root and descendant selectors:
+The selector ID joins the cleaned selected Theme names with `-`. Every file includes both forms:
 
 ```css
-:root[data-color-scheme="light"],
-[data-color-scheme="light"] {
-  --color-primary: #0055ff;
-  --button-background: var(--color-primary);
+:root[data-color-scheme="creative-dark"],
+[data-color-scheme="creative-dark"] {
+  /* variables */
 }
 ```
 
-Style Dictionary provides transformed kebab names. Two canonical paths mapping to the same case-insensitive CSS name fail with provenance. Simple direct aliases use `var()`; literals and values without a safe one-property alias remain static. No fallback is added because the referenced declaration is generated in the same effective graph and a missing declaration should remain visible.
+If several Theme Group files are loaded together, the target app owns CSS order and cascade.
 
-## Resolved JSON and manifest
+## JSON and manifest
 
-JSON maps canonical token paths to transformed type and fully resolved value, useful for CI comparison and debugging. The manifest maps a stable output key—normally the output ID, or the artifact base path when a repeated ID needs disambiguation—to ordered `{group,id,name}` Themes and relative CSS/JSON paths. Both are central artifacts; current delivery mappings copy only CSS.
+Resolved JSON uses the same path as CSS with a `.json` ending. `manifest.json` stays at the project output root and maps each context to its CSS and JSON files.
 
-Builds are deterministic: the output directory is recreated, records are path-sorted, JSON formatting is stable, and repeated builds from identical input produce identical trees.
+The build replaces the full project output folder. Keep only generated files there.
