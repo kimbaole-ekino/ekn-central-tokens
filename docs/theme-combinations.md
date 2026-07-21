@@ -8,8 +8,6 @@ Group order is stable. Central scans `$themes` from top to bottom and uses the f
 
 ## Validation
 
-The shared validator rejects missing or duplicate Theme IDs, invalid groups, invalid Set states, and invalid contexts. Stable Theme IDs provide identity. Display names provide output names and are checked for path conflicts.
+The shared validator rejects missing or duplicate Theme IDs, invalid groups, invalid Set states, and invalid contexts. Stable Theme IDs provide identity. Display names provide output names and are checked for path conflicts. Exact Theme semantics belong to the [validator contract](https://github.com/phamtruonghoaithanh-ekino/ekn-design-tokens-personal/blob/main/packages/token-validator/docs/canonical-document-contract.md).
 
-## Current Plugin behavior
-
-Token Architect currently has `ENABLE_THEME_GROUP = false`. Designers normally create Themes in one hidden `Default` group and use one active Theme. Central still supports valid canonical files with several groups.
+Token Architect authoring behavior is outside Central scope. See the [Plugin Themes guide](https://github.com/phamtruonghoaithanh-ekino/ekn-design-tokens-personal/blob/main/docs/en/themes-guide.md).

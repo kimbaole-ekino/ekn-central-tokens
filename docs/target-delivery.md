@@ -1,6 +1,6 @@
 # Target delivery configuration reference
 
-`targets.config.json` tells Central where to send built files. It is stored at the Central repository root. Current targets normally receive CSS only.
+`targets.config.json` tells Central where to send built files. It is stored at the Central repository root. Each target receives only its configured artifact types.
 
 ## Full example
 

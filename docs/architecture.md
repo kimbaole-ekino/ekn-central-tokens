@@ -1,10 +1,12 @@
 # Architecture
 
-## System boundary
+This page describes Central architecture only. Read the [overall product architecture](https://github.com/phamtruonghoaithanh-ekino/ekn-design-tokens-personal/blob/main/docs/project/architecture.md) for the complete Token Architect, validator, Central, and target system.
 
-Token Architect edits canonical `tokens.json`. Central reads that file and builds artifacts. Target apps use delivered CSS.
+## Central boundary
 
-`@eknvn/token-validator` is the shared authority for Token Set order, Theme states, references, and effective values. Central does not create a second token resolver. It owns project selection, safe paths, Theme combination generation, output names, collision checks, manifests, and delivery plans.
+Central receives reviewed canonical `tokens.json`, builds artifacts, and prepares configured target delivery.
+
+Central consumes `@eknvn/token-validator` for Token Set order, Theme states, references, and effective values. The [validator documentation](https://github.com/phamtruonghoaithanh-ekino/ekn-design-tokens-personal/tree/main/packages/token-validator/docs) owns those rules. Central owns project selection, safe paths, Theme combination builds, output names, collision checks, manifests, and delivery plans.
 
 ## Build steps
 
@@ -29,7 +31,7 @@ The build only removes and recreates a checked project output folder. Delivery o
 
 CSS is the target runtime contract. Resolved JSON helps maintainers check final values. `manifest.json` links Theme contexts to files and is used to plan delivery.
 
-Current targets map CSS only, so resolved JSON and the manifest do not enter target pull requests.
+Delivery includes only mapped artifact types. A CSS-only mapping keeps resolved JSON and the manifest in Central.
 
 ## CSS references
 
