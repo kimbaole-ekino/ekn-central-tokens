@@ -64,7 +64,7 @@ Resolved JSON stores the final value. Central writes a fixed value for complex, 
 
 ## Delivery boundary
 
-Current targets have only `destination.css`. Therefore:
+When a target has only `destination.css`:
 
 - CSS is copied with its nested paths;
 - resolved JSON is not copied;

@@ -2,6 +2,8 @@
 
 Central checks canonical `tokens.json`, builds stable artifacts, and prepares delivery to target repositories. It does not define a second token model.
 
+This repository documents Central-owned behavior only. Read the [overall product architecture](https://github.com/phamtruonghoaithanh-ekino/ekn-design-tokens-personal/blob/main/docs/project/architecture.md) and [end-to-end workflow](https://github.com/phamtruonghoaithanh-ekino/ekn-design-tokens-personal/blob/main/docs/project/end-to-end-workflow.md) in the Token Architect repository for the complete system.
+
 Token Architect and Central use the same `@eknvn/token-validator` package for Set order, Theme states, references, and effective values.
 
 ```text
@@ -43,7 +45,7 @@ Central writes generated files under each `dist/<project>` folder:
 
 One Theme Group creates flat files such as `light.css`. Several Theme Groups create nested paths from selected Theme names.
 
-Current target config sends CSS only because it has only `destination.css`. Resolved JSON and the manifest stay in Central unless exact destinations are added for them.
+A target receives only the configured artifact types. When it has only `destination.css`, resolved JSON and the manifest stay in Central.
 
 Apply mode deletes and recreates each listed target destination. These folders must contain generated files only. Delivery starts as a dry-run and never merges a target pull request.
 
@@ -74,4 +76,4 @@ npm run delivery:target-mr -- --project=site-a
 
 Remove `--project` to validate every registered and found canonical token file. Build and delivery only use registered projects that also have `tokens.json`.
 
-Delivery is a dry-run unless apply mode is clearly enabled. Start with the [documentation index](docs/README.md) for architecture, artifacts, delivery, maintenance, and problem solving.
+Delivery is a dry-run unless apply mode is clearly enabled. Start with the [Central documentation index](docs/README.md) for architecture, artifacts, delivery, maintenance, and problem solving.

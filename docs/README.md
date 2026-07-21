@@ -1,6 +1,8 @@
 # Central Tokens documentation
 
-These guides describe the current Central pipeline. They also explain how Central works with Token Architect and target apps.
+These guides describe only the current Central pipeline: configuration, validation integration, builds, artifacts, CI, and target delivery.
+
+For the complete product boundary and designer-to-target process, read the [overall architecture](https://github.com/phamtruonghoaithanh-ekino/ekn-design-tokens-personal/blob/main/docs/project/architecture.md) and [end-to-end workflow](https://github.com/phamtruonghoaithanh-ekino/ekn-design-tokens-personal/blob/main/docs/project/end-to-end-workflow.md). For exact token semantics, read the [validator documentation](https://github.com/phamtruonghoaithanh-ekino/ekn-design-tokens-personal/tree/main/packages/token-validator/docs).
 
 - [Architecture](architecture.md) — owners, main steps, and safety rules.
 - [Project configuration](project-configuration.md) — all fields in `projects.config.json`.
@@ -15,13 +17,13 @@ These guides describe the current Central pipeline. They also explain how Centra
 
 ## Who owns each part
 
-| Part                                                        | Owner                           |
-| ----------------------------------------------------------- | ------------------------------- |
-| Token values, references, Set order, Set states, and Themes | Designer through `tokens.json`  |
-| Token rules and error messages                              | `@eknvn/token-validator`        |
-| Project paths, build output, and CSS destinations           | Central configuration           |
-| CSS, resolved JSON, and manifest creation                   | Central build                   |
-| Stored JSON and manifest build evidence                     | Central CI and artifact storage |
-| CSS use, app tests, review, and merge                       | Target maintainer               |
+| Part                                              | Owner                           |
+| ------------------------------------------------- | ------------------------------- |
+| Canonical token input                             | Reviewed `tokens.json`          |
+| Shared token semantics used by Central            | `@eknvn/token-validator`        |
+| Project paths, build output, and CSS destinations | Central configuration           |
+| CSS, resolved JSON, and manifest creation         | Central build                   |
+| Stored JSON and manifest build evidence           | Central CI and artifact storage |
+| CSS use, app tests, review, and merge             | Target maintainer               |
 
-Current targets receive CSS only. Resolved JSON and the manifest stay in Central unless a target has an exact destination for them.
+A target receives only the artifact types with exact destinations. For example, a CSS-only destination keeps resolved JSON and the manifest in Central.
