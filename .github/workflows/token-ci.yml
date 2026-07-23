@@ -1,40 +1,52 @@
-name: Token CI
+name: Token Preview CI
 
 on:
   pull_request:
-    paths:
-      - "token-definitions/**"
-      - "projects.config.json"
-      - "targets.config.json"
-      - "scripts/**"
-      - "tests/**"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/token-ci.yml"
-  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
-  validate-build:
+  preview:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+        with: { fetch-depth: 0 }
       - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
+        with: { node-version: 22, cache: npm }
+      - name: Configure Validator registry
+        env:
+          GITLAB_HOST: ${{ vars.GITLAB_HOST }}
+          GITLAB_NPM_TOKEN: ${{ secrets.GITLAB_NPM_TOKEN }}
+          VALIDATOR_PROJECT_ID: ${{ vars.VALIDATOR_PROJECT_ID }}
+        run: |
+          set -eu
+          test -n "$GITLAB_HOST"
+          test -n "$GITLAB_NPM_TOKEN"
+          test -n "$VALIDATOR_PROJECT_ID"
+          case "$GITLAB_HOST" in *[/:[:space:]]*) exit 1;; esac
+          REGISTRY_PATH="${GITLAB_HOST}/api/v4/projects/${VALIDATOR_PROJECT_ID}/packages/npm/"
+          printf '%s\n' \
+            "@ekinotech:registry=https://${REGISTRY_PATH}" \
+            "//${REGISTRY_PATH}:_authToken=${GITLAB_NPM_TOKEN}" > .npmrc
       - run: npm ci
+      - name: Remove Validator registry credentials
+        if: always()
+        run: rm -f .npmrc
       - run: npm test
       - run: npm run typecheck
-      - name: Detect affected token projects
-        if: github.event_name == 'pull_request'
-        run: npm run detect:affected-projects -- --base=${{ github.event.pull_request.base.sha }} --head=${{ github.sha }}
+      - name: Detect affected projects
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: npm run detect:affected-projects -- --base="$BASE" --head=${{ github.sha }}
       - run: npm run validate:tokens
       - run: npm run build:artifacts
-      - name: Upload token artifacts
-        uses: actions/upload-artifact@v4
+      - run: npm run build:packages -- --source-commit=${{ github.sha }}
+      - run: npm run build:storybook -- --source-commit=${{ github.sha }}
+      - uses: actions/upload-artifact@v4
         with:
-          name: token-dist
+          name: token-previews-${{ github.run_id }}
           path: dist/
           if-no-files-found: ignore
