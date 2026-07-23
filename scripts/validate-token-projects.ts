@@ -1,102 +1,83 @@
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { discoverTokenProjects } from "./lib/project-discovery.js";
+import { getChangelogSection, parsePackageVersion } from "./lib/release.js";
+import {
+  getSelectedProjectIds,
+  getSelectedProjects,
+} from "./lib/project-selection.js";
 import {
   getProjectsConfig,
-  getTargetsConfig,
   readTokenDocument,
   validateTokenDocument,
 } from "./lib/token-utils.js";
-import { getSelectedProjectIds } from "./lib/project-selection.js";
-import { discoverTokenProjects } from "./lib/project-discovery.js";
-import type {
-  ProjectsConfig,
-  TargetConfig,
-  TargetsConfig,
-} from "./lib/types.js";
+import type { ProjectsConfig, TokenProject } from "./lib/types.js";
 
-if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url)
+if (
+  process.argv[1] &&
+  pathToFileURL(process.argv[1]).href === import.meta.url
+) {
   try {
     main();
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
   }
+}
 
 function main(): void {
   const rootDir = process.cwd();
   const config = getProjectsConfig(rootDir);
-  const targetsConfig = getTargetsConfig(rootDir);
-  const projectIds = new Set<string>();
-  let validatedTokenFiles = 0;
-
-  validateProjectsConfig(config, projectIds);
-  validateTargetsConfig(targetsConfig, config, projectIds);
-
-  const configuredProjects = config.projects ?? [];
+  validateProjectsConfig(config, rootDir);
+  const configured = config.projects ?? [];
   const configuredTokenFiles = new Set(
-    configuredProjects.map((project) => normalizeRepoPath(project.tokenFile)),
+    configured.map((project) => normalizeRepoPath(project.tokenFile)),
   );
-  const unregisteredProjects = discoverTokenProjects(rootDir).filter(
+  const unregistered = discoverTokenProjects(rootDir).filter(
     (project) =>
       !configuredTokenFiles.has(normalizeRepoPath(project.tokenFile)),
   );
-  const selectedProjectIds = getValidationSelectedProjectIds();
-  if (selectedProjectIds) {
-    const knownProjectIds = new Set([
-      ...configuredProjects.map((project) => project.id),
-      ...unregisteredProjects.map((project) => project.id),
-    ]);
-    for (const projectId of selectedProjectIds) {
-      if (!knownProjectIds.has(projectId)) {
-        throw new Error(`Unknown token project selected: ${projectId}`);
-      }
-    }
-  }
-  const selectedProjects = configuredProjects.filter(
-    (project) => !selectedProjectIds || selectedProjectIds.has(project.id),
-  );
-  const selectedUnregisteredProjects = unregisteredProjects.filter(
-    (project) => !selectedProjectIds || selectedProjectIds.has(project.id),
-  );
-  let missingTokenFiles = 0;
-  for (const project of selectedProjects) {
-    const tokenPath = path.join(rootDir, project.tokenFile);
-    if (!fs.existsSync(tokenPath)) {
-      console.log(`Skipping ${project.id}: waiting for ${project.tokenFile}.`);
-      missingTokenFiles += 1;
-      continue;
-    }
-    const tokens = readTokenDocument(tokenPath);
-    validateTokenDocument(tokens, project.tokenFile);
-    validatedTokenFiles += 1;
-  }
+  const selectedIds = getValidationSelectedProjectIds();
+  const knownIds = new Set([
+    ...configured.map((project) => project.id),
+    ...unregistered.map((project) => project.id),
+  ]);
+  if (selectedIds)
+    for (const id of selectedIds)
+      if (!knownIds.has(id))
+        throw new Error(`Unknown token project selected: ${id}`);
 
-  for (const project of selectedUnregisteredProjects) {
+  const selected = getSelectedProjects(configured, selectedIds);
+  const selectedUnregistered = unregistered.filter(
+    (project) => !selectedIds || selectedIds.has(project.id),
+  );
+  let validated = 0;
+  for (const project of selected) {
     const tokenPath = path.join(rootDir, project.tokenFile);
-    const tokens = readTokenDocument(tokenPath);
-    validateTokenDocument(tokens, project.tokenFile);
-    validatedTokenFiles += 1;
+    validateTokenDocument(readTokenDocument(tokenPath), project.tokenFile);
+    validated += 1;
+  }
+  for (const project of selectedUnregistered) {
+    validateTokenDocument(
+      readTokenDocument(path.join(rootDir, project.tokenFile)),
+      project.tokenFile,
+    );
+    validated += 1;
     console.log(
       `Validated ${project.tokenFile}; waiting for project configuration.`,
     );
   }
-
-  console.log(`Validated ${validatedTokenFiles} token file(s).`);
-  if (missingTokenFiles > 0) {
-    console.log(`Skipped ${missingTokenFiles} project(s) without tokens.json.`);
-  }
-  if (selectedUnregisteredProjects.length > 0) {
+  console.log(`Validated ${validated} token file(s).`);
+  if (selectedUnregistered.length)
     console.log(
-      `${selectedUnregisteredProjects.length} token file(s) without project configuration.`,
+      `${selectedUnregistered.length} token file(s) without project configuration.`,
     );
-  }
 }
 
 function getValidationSelectedProjectIds(): Set<string> | null {
-  if (!("TOKEN_VALIDATION_PROJECTS" in process.env)) {
+  if (!("TOKEN_VALIDATION_PROJECTS" in process.env))
     return getSelectedProjectIds();
-  }
   return getSelectedProjectIds(process.argv.slice(2), {
     ...process.env,
     TOKEN_PROJECTS: process.env.TOKEN_VALIDATION_PROJECTS,
@@ -108,205 +89,129 @@ function normalizeRepoPath(value: string): string {
 }
 
 export function validateProjectsConfig(
-  projectsConfig: ProjectsConfig,
-  projectIds: Set<string>,
+  config: ProjectsConfig,
+  rootDir?: string,
 ): void {
-  rejectUnknownFields(projectsConfig, ["projects"], "projects.config.json");
-  if (!Array.isArray(projectsConfig.projects)) {
+  rejectUnknownFields(config, ["projects"], "projects.config.json");
+  if (!Array.isArray(config.projects))
     throw new Error('projects.config.json: "projects" must be an array.');
-  }
-
-  for (const [index, project] of projectsConfig.projects.entries()) {
-    const pathPrefix = `projects.config.json.projects[${index}]`;
-    rejectUnknownFields(project, ["id", "tokenFile", "outputDir"], pathPrefix);
-    requireString(project.id, `${pathPrefix}.id`);
-    requireString(project.tokenFile, `${pathPrefix}.tokenFile`);
-    requireString(project.outputDir, `${pathPrefix}.outputDir`);
-
-    if (projectIds.has(project.id)) {
-      throw new Error(`${pathPrefix}.id duplicates project ${project.id}.`);
-    }
-    projectIds.add(project.id);
-
-    if (!project.tokenFile.endsWith("/tokens.json")) {
-      throw new Error(
-        `${pathPrefix}.tokenFile must point to a tokens.json file.`,
-      );
-    }
-    if (
-      path.isAbsolute(project.tokenFile) ||
-      project.tokenFile.includes("..")
-    ) {
-      throw new Error(`${pathPrefix}.tokenFile must be repository-relative.`);
-    }
-    if (
-      path.isAbsolute(project.outputDir) ||
-      project.outputDir.includes("..")
-    ) {
-      throw new Error(`${pathPrefix}.outputDir must be repository-relative.`);
-    }
-  }
-}
-
-export function validateTargetsConfig(
-  targetsConfig: TargetsConfig,
-  projectsConfig: ProjectsConfig,
-  projectIds: Set<string>,
-): void {
-  rejectUnknownFields(targetsConfig, ["targets"], "targets.config.json");
-  if (!Array.isArray(targetsConfig.targets)) {
-    throw new Error('targets.config.json: "targets" must be an array.');
-  }
-
-  const outputByProject = new Map(
-    (projectsConfig.projects ?? []).map((project) => [
-      project.id,
-      project.outputDir,
-    ]),
-  );
-  const destinations: Array<{
-    repo: string;
-    branch: string;
-    path: string;
-    field: string;
-  }> = [];
-
-  for (const [index, target] of targetsConfig.targets.entries()) {
-    const pathPrefix = `targets.config.json.targets[${index}]`;
+  const ids = new Set<string>();
+  const packageNames = new Set<string>();
+  const documentationSlugs = new Set<string>();
+  const outputs: Array<{ path: string; field: string }> = [];
+  for (const [index, project] of config.projects.entries()) {
+    const prefix = `projects.config.json.projects[${index}]`;
     rejectUnknownFields(
-      target,
-      ["project", "repo", "branch", "source", "destination", "delivery"],
-      pathPrefix,
+      project,
+      [
+        "id",
+        "tokenFile",
+        "outputDir",
+        "packageName",
+        "version",
+        "documentationSlug",
+        "enabled",
+        "disabledReason",
+      ],
+      prefix,
     );
-    requireString(target.project, `${pathPrefix}.project`);
-    requireString(target.repo, `${pathPrefix}.repo`);
-    requireString(target.branch, `${pathPrefix}.branch`);
-    requireString(target.source, `${pathPrefix}.source`);
-    requireString(target.destination?.css, `${pathPrefix}.destination.css`);
-    rejectUnknownFields(
-      target.destination,
-      ["css", "json", "manifest"],
-      `${pathPrefix}.destination`,
+    for (const field of [
+      "id",
+      "tokenFile",
+      "outputDir",
+      "packageName",
+      "version",
+      "documentationSlug",
+    ] as const)
+      requireString(project[field], `${prefix}.${field}`);
+    if (typeof project.enabled !== "boolean")
+      throw new Error(`${prefix}.enabled must be a boolean.`);
+    rejectDuplicate(ids, project.id, `${prefix}.id`);
+    rejectDuplicate(packageNames, project.packageName, `${prefix}.packageName`);
+    rejectDuplicate(
+      documentationSlugs,
+      project.documentationSlug,
+      `${prefix}.documentationSlug`,
     );
-    validateDeliveryConfig(target.delivery, `${pathPrefix}.delivery`);
-
-    if (!projectIds.has(target.project)) {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(project.id))
       throw new Error(
-        `${pathPrefix}.project references unknown project ${target.project}.`,
+        `${prefix}.id must be a lowercase kebab-case project ID.`,
+      );
+    if (project.packageName !== `@ekinotech/design-tokens-${project.id}`)
+      throw new Error(
+        `${prefix}.packageName must be @ekinotech/design-tokens-${project.id}.`,
+      );
+    const parsedVersion = parsePackageVersion(project.version);
+    if (parsedVersion.rc !== null)
+      throw new Error(`${prefix}.version must be a stable SemVer version.`);
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(project.documentationSlug))
+      throw new Error(
+        `${prefix}.documentationSlug must be a lowercase kebab-case slug.`,
+      );
+    if (!project.enabled) {
+      requireString(project.disabledReason, `${prefix}.disabledReason`);
+    } else if (project.disabledReason !== undefined) {
+      throw new Error(
+        `${prefix}.disabledReason is allowed only when enabled is false.`,
       );
     }
-
-    const expectedSource = outputByProject.get(target.project);
-    if (target.source !== expectedSource) {
+    if (!project.tokenFile.endsWith("/tokens.json"))
+      throw new Error(`${prefix}.tokenFile must point to a tokens.json file.`);
+    for (const field of ["tokenFile", "outputDir"] as const)
+      assertSafeRepoPath(project[field], `${prefix}.${field}`);
+    if (
+      project.enabled &&
+      rootDir &&
+      !fs.existsSync(path.join(rootDir, project.tokenFile))
+    )
       throw new Error(
-        `${pathPrefix}.source must match ${target.project} outputDir (${expectedSource}).`,
+        `${prefix}.tokenFile does not exist for enabled project ${project.id}: ${project.tokenFile}.`,
       );
-    }
-
-    for (const [field, value] of Object.entries(target.destination ?? {})) {
-      if (typeof value !== "string" || !value.trim()) {
-        throw new Error(`${pathPrefix}.destination.${field} must be a string.`);
-      }
-      if (path.isAbsolute(value) || value.includes("..")) {
+    if (project.enabled && rootDir) {
+      const changelogPath = path.join(
+        rootDir,
+        path.dirname(project.tokenFile),
+        "CHANGELOG.md",
+      );
+      if (!fs.existsSync(changelogPath))
         throw new Error(
-          `${pathPrefix}.destination.${field} must be target-repository-relative.`,
+          `${prefix} requires ${normalizeRepoPath(path.relative(rootDir, changelogPath))}.`,
         );
-      }
-      const candidate = {
-        repo: target.repo.toLocaleLowerCase(),
-        branch: target.branch.toLocaleLowerCase(),
-        path: value.replace(/\\/g, "/").replace(/\/+$/, "").toLocaleLowerCase(),
-        field: `${pathPrefix}.destination.${field}`,
-      };
-      const conflict = destinations.find(
-        (existing) =>
-          existing.repo === candidate.repo &&
-          existing.branch === candidate.branch &&
-          pathsOverlap(existing.path, candidate.path),
+      getChangelogSection(
+        fs.readFileSync(changelogPath, "utf8"),
+        project.version,
       );
-      if (conflict)
-        throw new Error(`${candidate.field} conflicts with ${conflict.field}.`);
-      destinations.push(candidate);
     }
+    const normalizedOutput = normalizeRepoPath(project.outputDir).replace(
+      /\/$/,
+      "",
+    );
+    const conflict = outputs.find((item) =>
+      pathsOverlap(item.path.toLowerCase(), normalizedOutput.toLowerCase()),
+    );
+    if (conflict)
+      throw new Error(`${prefix}.outputDir overlaps ${conflict.field}.`);
+    outputs.push({ path: normalizedOutput, field: `${prefix}.outputDir` });
   }
 }
 
-function validateDeliveryConfig(
-  delivery: TargetConfig["delivery"],
-  pathPrefix: string,
+function rejectDuplicate(
+  values: Set<string>,
+  value: string,
+  field: string,
 ): void {
-  if (delivery === undefined) return;
+  if (values.has(value)) throw new Error(`${field} duplicates ${value}.`);
+  values.add(value);
+}
+function assertSafeRepoPath(value: string, field: string): void {
   if (
-    delivery === null ||
-    typeof delivery !== "object" ||
-    Array.isArray(delivery)
-  ) {
-    throw new Error(`${pathPrefix} must be an object.`);
-  }
-  rejectUnknownFields(
-    delivery,
-    [
-      "provider",
-      "branchPrefix",
-      "branchName",
-      "title",
-      "body",
-      "reviewers",
-      "labels",
-    ],
-    pathPrefix,
-  );
-
-  if (delivery.provider !== undefined) {
-    requireString(delivery.provider, `${pathPrefix}.provider`);
-    if (delivery.provider !== "github") {
-      throw new Error(
-        `${pathPrefix}.provider must be "github"; provider ${delivery.provider} is not implemented.`,
-      );
-    }
-  }
-
-  for (const [field, value] of [
-    ["branchPrefix", delivery.branchPrefix],
-    ["branchName", delivery.branchName],
-    ["title", delivery.title],
-    ["body", delivery.body],
-  ] as const) {
-    if (value === undefined) continue;
-    requireString(value, `${pathPrefix}.${field}`);
-  }
-
-  for (const [field, value] of [
-    ["reviewers", delivery.reviewers],
-    ["labels", delivery.labels],
-  ] as const) {
-    if (value === undefined) continue;
-    if (
-      !Array.isArray(value) ||
-      value.some((item) => typeof item !== "string" || !item.trim())
-    ) {
-      throw new Error(
-        `${pathPrefix}.${field} must be an array of non-empty strings.`,
-      );
-    }
-  }
+    path.isAbsolute(value) ||
+    value.split(/[\\/]/).includes("..") ||
+    value.trim() !== value ||
+    !value
+  )
+    throw new Error(`${field} must be a safe repository-relative path.`);
 }
-
-function rejectUnknownFields(
-  value: unknown,
-  allowedFields: readonly string[],
-  pathPrefix: string,
-): void {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    return;
-  }
-  const allowed = new Set(allowedFields);
-  const unknown = Object.keys(value).find((field) => !allowed.has(field));
-  if (unknown) {
-    throw new Error(`${pathPrefix}.${unknown} is not a recognized field.`);
-  }
-}
-
 function pathsOverlap(left: string, right: string): boolean {
   return (
     left === right ||
@@ -314,9 +219,18 @@ function pathsOverlap(left: string, right: string): boolean {
     right.startsWith(`${left}/`)
   );
 }
-
+function rejectUnknownFields(
+  value: unknown,
+  allowed: readonly string[],
+  prefix: string,
+): void {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return;
+  const known = new Set(allowed);
+  const unknown = Object.keys(value).find((field) => !known.has(field));
+  if (unknown)
+    throw new Error(`${prefix}.${unknown} is not a recognized field.`);
+}
 function requireString(value: unknown, field: string): asserts value is string {
-  if (typeof value !== "string" || !value.trim()) {
+  if (typeof value !== "string" || !value.trim())
     throw new Error(`${field} must be a non-empty string.`);
-  }
 }

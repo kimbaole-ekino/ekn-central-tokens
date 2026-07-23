@@ -4,7 +4,7 @@ import {
   resolveActiveThemeContext,
   resolveEffectiveTokens,
   validateTokenDocument as validateShared,
-} from "@eknvn/token-validator";
+} from "@ekinotech/design-token-validator";
 import { validateTokenDocument } from "../scripts/lib/token-utils.js";
 import { permutateThemes } from "@tokens-studio/sd-transforms";
 import { TokenSetStatus } from "@tokens-studio/types";

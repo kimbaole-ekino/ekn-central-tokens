@@ -1,4 +1,4 @@
-import type { TokenDocument as SharedTokenDocument } from "@eknvn/token-validator";
+import type { TokenDocument as SharedTokenDocument } from "@ekinotech/design-token-validator";
 
 export type TokenDocument = SharedTokenDocument;
 
@@ -6,36 +6,15 @@ export interface TokenProject {
   id: string;
   tokenFile: string;
   outputDir: string;
+  packageName: string;
+  version: string;
+  documentationSlug: string;
+  enabled: boolean;
+  disabledReason?: string;
 }
 export interface ProjectsConfig {
   projects?: TokenProject[];
 }
-export interface TargetDestination {
-  css?: string;
-  json?: string;
-  manifest?: string;
-}
-export interface DeliveryConfig {
-  provider?: unknown;
-  branchPrefix?: unknown;
-  branchName?: unknown;
-  title?: unknown;
-  body?: unknown;
-  reviewers?: unknown;
-  labels?: unknown;
-}
-export interface TargetConfig {
-  project: string;
-  repo: string;
-  branch: string;
-  source: string;
-  destination?: TargetDestination;
-  delivery?: DeliveryConfig;
-}
-export interface TargetsConfig {
-  targets?: TargetConfig[];
-}
-
 export interface BuildManifest {
   projectId: string;
   outputs: Record<

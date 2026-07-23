@@ -1,25 +1,34 @@
 {
-  "name": "ekn-central-tokens",
+  "name": "design-token-central",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "test": "tsx --test tests/*.test.ts",
-    "validate": "npm test && npm run typecheck && npm run validate:tokens && npm run build:artifacts && npm run delivery:target-mr",
-    "validate:tokens": "tsx scripts/validate-token-projects.ts",
-    "detect:affected-projects": "tsx scripts/detect-affected-token-projects.ts",
-    "build:artifacts": "tsx scripts/build-token-artifacts.ts",
-    "delivery:target-mr": "tsx scripts/create-target-merge-requests.ts",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "validate": "npm test && npm run typecheck && npm run validate:tokens && npm run build:artifacts && npm run build:packages && npm run build:storybook",
+    "validate:tokens": "node --import tsx scripts/validate-token-projects.ts",
+    "detect:affected-projects": "node --import tsx scripts/detect-affected-token-projects.ts",
+    "build:artifacts": "node --import tsx scripts/build-token-artifacts.ts",
+    "build:packages": "node --import tsx scripts/build-project-package.ts",
+    "storybook": "node --import tsx scripts/build-project-storybook.ts --serve",
+    "build:storybook": "node --import tsx scripts/build-project-storybook.ts",
+    "build:project-release": "node --import tsx scripts/build-project-release.ts",
+    "release:info": "node --import tsx scripts/release-info.ts",
+    "format": "prettier --write \"{.github,.storybook,docs,scripts,storybook,tests}/**/*.{json,md,ts,yml}\" \"*.{json,md}\"",
+    "format:check": "prettier --check \"{.github,.storybook,docs,scripts,storybook,tests}/**/*.{json,md,ts,yml}\" \"*.{json,md}\"",
     "typecheck": "tsc --noEmit"
   },
   "engines": {
     "node": "22.x"
   },
   "devDependencies": {
-    "@eknvn/token-validator": "^0.1.0-uat.6",
+    "@ekinotech/design-token-validator": "0.1.0",
+    "@storybook/html-vite": "^10.5.3",
     "@tokens-studio/sd-transforms": "^1.3.0",
     "@tokens-studio/types": "^0.5.2",
     "@types/node": "^26.1.0",
+    "prettier": "^3.9.6",
+    "storybook": "^10.5.3",
     "style-dictionary": "^4.4.0",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3"

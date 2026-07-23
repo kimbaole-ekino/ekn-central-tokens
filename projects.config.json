@@ -3,12 +3,21 @@
     {
       "id": "ekn-design-tokens-target",
       "tokenFile": "token-definitions/projects/ekn-design-tokens-target/tokens.json",
-      "outputDir": "dist/ekn-design-tokens-target"
+      "outputDir": "dist/ekn-design-tokens-target",
+      "packageName": "@ekinotech/design-tokens-ekn-design-tokens-target",
+      "version": "0.1.0",
+      "documentationSlug": "ekn-design-tokens-target",
+      "enabled": true
     },
     {
       "id": "havas-network-websites",
       "tokenFile": "token-definitions/projects/havas-network-websites/tokens.json",
-      "outputDir": "dist/havas-network-websites"
+      "outputDir": "dist/havas-network-websites",
+      "packageName": "@ekinotech/design-tokens-havas-network-websites",
+      "version": "0.1.0",
+      "documentationSlug": "havas-network-websites",
+      "enabled": false,
+      "disabledReason": "Canonical tokens.json is not present on the current main baseline."
     }
   ]
 }
