@@ -1,77 +1,36 @@
 # Artifact contract
 
-## Purpose
+`raw/` contains generated CSS, resolved JSON, and the build manifest. Resolved JSON is internal and is not included in the consumer package.
 
-Central builds files for review and target use. A file in `dist/` is not delivered unless `targets.config.json` maps it.
-
-## Central output tree
-
-For one Theme Group:
-
-```text
-dist/<project-id>/
-  <theme>.css
-  <theme>.json
-  manifest.json
-```
-
-Example:
-
-```text
-dist/site-a/light.css
-dist/site-a/light.json
-dist/site-a/dark.css
-dist/site-a/dark.json
-dist/site-a/manifest.json
-```
-
-For several Theme Groups, selected Theme names form nested paths:
-
-```text
-dist/site-a/creative/react/light.css
-dist/site-a/creative/react/light.json
-```
-
-Final paths are stable and checked for conflicts after name cleanup.
-
-## CSS selectors
-
-Each CSS file supports a scheme on the document root and on a smaller block:
+One Theme Group creates flat files such as `light.css`. Several Theme Groups create nested paths such as `brand/light.css`. CSS supports both root and scoped selectors:
 
 ```css
-:root[data-color-scheme="light"],
-[data-color-scheme="light"] {
-  --color-background: #ffffff;
+:root[data-color-scheme="brand-light"],
+[data-color-scheme="brand-light"] {
 }
 ```
 
-The target app decides which element owns `data-color-scheme`.
+`package/` contains CSS, README, `project-build.json`, and a generated `package.json` with explicit CSS exports. `packages/` contains only the local `.tgz`. `storybook-static/` contains the static guide and its `project-build.json`.
 
-## CSS references
+For a project-output release, `artifacts/` contains:
 
-A simple direct token reference stays linked when both CSS variables are safe:
-
-```css
---color-primary: #0055ff;
---button-background: var(--color-primary);
+```text
+design-tokens-<project-id>-v<version>.tgz
+design-tokens-<project-id>-v<version>.zip
+release-notes.md
 ```
 
-Resolved JSON stores the final value. Central writes a fixed value for complex, embedded, unsupported, or unsafe references.
+The `.tgz` is published through GitHub Packages. Only the `.zip` is uploaded as a custom GitHub Release asset. The local `artifacts/release-notes.md` records the archive names and hashes. The GitHub Release description comes from the matching project changelog section in `release-metadata/release-notes.md`. Neither notes file is uploaded as an asset.
 
-## Manifest
+The full ZIP contains:
 
-`manifest.json` records output IDs, selected Themes, and file paths. Central uses it for review and delivery planning. Target apps do not need it at runtime.
+```text
+package/
+storybook/
+BUILD_INFO.json
+checksums.txt
+```
 
-## Delivery boundary
+The `.tgz` is directly installable and never contains Storybook. `BUILD_INFO.json` records the project, output version and tag, Central version and commit, Validator version, CSS outputs, and Themes. `checksums.txt` covers the files inside the ZIP.
 
-When a target has only `destination.css`:
-
-- CSS is copied with its nested paths;
-- resolved JSON is not copied;
-- `manifest.json` is not copied.
-
-Add an exact destination and tests before delivering another format.
-
-## Changes that need target review
-
-Coordinate with target maintainers when changing selectors, CSS variable names, Theme path rules, reference output, delivery folders, or generated scheme names.
+Builds reject unsafe paths, output collisions, unresolved diagnostics, missing CSS, and cross-project content. Enabled projects must have canonical data. Disabled projects need a reason and are excluded from broad builds. Rebuilds may replace `raw`, `package`, `packages`, and `storybook-static`; release assets are not overwritten.
