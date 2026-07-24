@@ -1,5 +1,6 @@
 # Dependencies and package manager state
 node_modules/
+.npmrc
 yarn.lock
 pnpm-lock.yaml
 bun.lockb
@@ -8,6 +9,9 @@ bun.lockb
 
 # Generated build outputs
 dist/
+site/
+release-artifacts/
+release-metadata/
 build/
 out/
 artifacts/
@@ -53,3 +57,4 @@ Thumbs.db
 # Local delivery scratch space
 .delivery/
 .release/
+storybook/generated-guide.mjs

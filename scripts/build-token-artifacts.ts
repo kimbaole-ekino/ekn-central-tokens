@@ -5,7 +5,7 @@ import {
   resolveEffectiveTokens,
   resolveThemePermutations,
   type EffectiveThemeContext,
-} from "@eknvn/token-validator";
+} from "@ekinotech/design-token-validator";
 import {
   getSelectedProjectIds,
   getSelectedProjects,
@@ -54,12 +54,28 @@ export async function buildProject(
   }
   const document = readTokenDocument(tokenPath);
   validateTokenDocument(document, project.tokenFile);
-  const outputDir = path.resolve(rootDir, project.outputDir);
+  const projectOutputDir = path.resolve(rootDir, project.outputDir);
   const root = path.resolve(rootDir);
-  if (!outputDir.startsWith(`${root}${path.sep}`))
+  if (!projectOutputDir.startsWith(`${root}${path.sep}`))
     throw new Error(
       `${project.id} outputDir must remain inside the repository.`,
     );
+  fs.mkdirSync(projectOutputDir, { recursive: true });
+  const currentLayout = new Set([
+    "raw",
+    "package",
+    "packages",
+    "storybook-static",
+    "artifacts",
+  ]);
+  for (const entry of fs.readdirSync(projectOutputDir)) {
+    if (!currentLayout.has(entry))
+      fs.rmSync(path.join(projectOutputDir, entry), {
+        recursive: true,
+        force: true,
+      });
+  }
+  const outputDir = path.join(projectOutputDir, "raw");
   fs.rmSync(outputDir, { recursive: true, force: true });
   fs.mkdirSync(outputDir, { recursive: true });
   const contexts = derivedContexts(document);

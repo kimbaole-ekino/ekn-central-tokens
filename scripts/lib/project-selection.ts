@@ -26,12 +26,18 @@ export function getSelectedProjects(
   projects: TokenProject[],
   selectedProjectIds: Set<string> | null,
 ): TokenProject[] {
-  if (!selectedProjectIds) return projects;
+  if (!selectedProjectIds) return projects.filter((project) => project.enabled);
 
   const knownProjectIds = new Set(projects.map((project) => project.id));
   for (const projectId of selectedProjectIds) {
     if (!knownProjectIds.has(projectId)) {
       throw new Error(`Unknown token project selected: ${projectId}`);
+    }
+    const project = projects.find((candidate) => candidate.id === projectId);
+    if (!project?.enabled) {
+      throw new Error(
+        `${projectId} is disabled: ${project?.disabledReason ?? "no reason was provided"}.`,
+      );
     }
   }
 

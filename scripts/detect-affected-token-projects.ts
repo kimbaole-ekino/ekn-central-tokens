@@ -1,174 +1,64 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { discoverTokenProjects } from "./lib/project-discovery.js";
-import { getProjectsConfig, getTargetsConfig } from "./lib/token-utils.js";
-import type { ProjectsConfig, TargetsConfig } from "./lib/types.js";
+import {
+  detectAffectedProjects,
+  fallbackAffectedProjects,
+} from "./lib/affected-projects.js";
+import { getProjectsConfig } from "./lib/token-utils.js";
+import type { ProjectsConfig, TokenProject } from "./lib/types.js";
+import { validateProjectsConfig } from "./validate-token-projects.js";
 
-const rootDir = process.cwd();
-const baseRef = getArgValue("--base") ?? process.env.AFFECTED_BASE_REF;
-const headRef =
-  getArgValue("--head") ?? process.env.AFFECTED_HEAD_REF ?? "HEAD";
-const currentProjectsConfig = getProjectsConfig(rootDir);
-const currentTargetsConfig = getTargetsConfig(rootDir);
-const currentProjects = currentProjectsConfig.projects ?? [];
-const currentProjectIds = new Set(currentProjects.map((project) => project.id));
-const discoveredProjectIds = new Set(
-  discoverTokenProjects(rootDir).map((project) => project.id),
-);
-const affectedProjectIds = new Set<string>();
-let buildAll = false;
-
-if (!baseRef) {
-  buildAll = true;
-} else if (isZeroCommit(baseRef)) {
-  console.warn(
-    "Base ref is the zero commit; falling back to all token projects.",
-  );
-  buildAll = true;
-} else if (!commitExists(baseRef)) {
-  console.warn(
-    `Base ref ${baseRef} is not available locally; falling back to all token projects.`,
-  );
-  buildAll = true;
-} else if (!commitExists(headRef)) {
-  console.warn(
-    `Head ref ${headRef} is not available locally; falling back to all token projects.`,
-  );
-  buildAll = true;
-} else {
-  const changedFiles = getChangedFiles(baseRef, headRef);
-  const baseProjectsConfig = readJsonAtRef<ProjectsConfig>(
-    baseRef,
-    "projects.config.json",
-  ) ?? { projects: [] };
-  const baseTargetsConfig = readJsonAtRef<TargetsConfig>(
-    baseRef,
-    "targets.config.json",
-  ) ?? { targets: [] };
-
-  for (const filePath of changedFiles) {
-    markAffectedByPath(filePath, baseProjectsConfig, baseTargetsConfig);
-  }
-}
-
-const selectedProjectIds = buildAll
-  ? currentProjects.map((project) => project.id)
-  : [...affectedProjectIds].filter((projectId) =>
-      currentProjectIds.has(projectId),
-    );
-const validationProjectIds = buildAll
-  ? [...new Set([...currentProjectIds, ...discoveredProjectIds])]
-  : [...affectedProjectIds].filter(
-      (projectId) =>
-        currentProjectIds.has(projectId) || discoveredProjectIds.has(projectId),
-    );
-
-emitGithubEnv("TOKEN_PROJECTS", selectedProjectIds.join(","));
-emitGithubEnv("TOKEN_VALIDATION_PROJECTS", validationProjectIds.join(","));
-emitGithubEnv("TARGET_DELIVERY_PROJECTS", selectedProjectIds.join(","));
-
-console.log(
-  selectedProjectIds.length > 0
-    ? `Affected token projects: ${selectedProjectIds.join(", ")}`
-    : "Affected token projects: none",
-);
-console.log(
-  validationProjectIds.length > 0
-    ? `Token projects selected for validation: ${validationProjectIds.join(", ")}`
-    : "Token projects selected for validation: none",
-);
-
-function markAffectedByPath(
-  filePath: string,
-  baseProjectsConfig: ProjectsConfig,
-  baseTargetsConfig: TargetsConfig,
-): void {
-  const tokenMatch = filePath.match(/^token-definitions\/projects\/([^/]+)\//);
-  if (tokenMatch?.[1]) {
-    affectedProjectIds.add(tokenMatch[1]);
-    return;
-  }
-
-  if (filePath === "projects.config.json") {
-    addChangedConfigProjects(
-      baseProjectsConfig.projects ?? [],
-      currentProjectsConfig.projects ?? [],
-    );
-    return;
-  }
-
-  if (filePath === "targets.config.json") {
-    addChangedConfigProjects(
-      baseTargetsConfig.targets ?? [],
-      currentTargetsConfig.targets ?? [],
-      "project",
-    );
-    return;
-  }
-
+const root = process.cwd();
+try {
+  const current = getProjectsConfig(root);
+  validateProjectsConfig(current, root);
+  const base = arg("--base") ?? process.env.AFFECTED_BASE_REF;
+  const head = arg("--head") ?? process.env.AFFECTED_HEAD_REF ?? "HEAD";
+  let result;
   if (
-    filePath.startsWith("scripts/") ||
-    filePath === "package.json" ||
-    filePath === "package-lock.json" ||
-    filePath === ".github/workflows/token-ci.yml"
+    !base ||
+    /^0{40}$/.test(base) ||
+    !commitExists(base) ||
+    !commitExists(head)
   ) {
-    buildAll = true;
-  }
-}
-
-function addChangedConfigProjects(
-  beforeItems: unknown[],
-  afterItems: unknown[],
-  idField = "id",
-): void {
-  const beforeById = mapById(beforeItems, idField);
-  const afterById = mapById(afterItems, idField);
-  const ids = new Set([...beforeById.keys(), ...afterById.keys()]);
-
-  for (const id of ids) {
-    const before = beforeById.get(id);
-    const after = afterById.get(id);
-    if (stableStringify(before) !== stableStringify(after)) {
-      affectedProjectIds.add(id);
-    }
-  }
-}
-
-function mapById(items: unknown[], idField: string): Map<string, unknown> {
-  const entries: [string, unknown][] = [];
-  for (const item of items) {
-    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
-    const record = item as Record<string, unknown>;
-    if (typeof record[idField] === "string") {
-      entries.push([record[idField], item]);
-    }
-  }
-  return new Map(entries);
-}
-
-function getChangedFiles(base: string, head: string): string[] {
-  try {
-    return execFileSync("git", ["diff", "--name-only", base, head], {
-      cwd: rootDir,
-      encoding: "utf8",
-    })
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-  } catch (error) {
     console.warn(
-      `Unable to diff ${base}..${head}; falling back to all token projects.`,
+      "Base or head commit is unavailable; selecting every token project.",
     );
-    if (hasStderr(error)) console.warn(String(error.stderr).trim());
-    buildAll = true;
-    return [];
+    result = fallbackAffectedProjects(
+      current.projects ?? [],
+      discoverTokenProjects(root).map((project) => project.id),
+    );
+  } else {
+    result = detectAffectedProjects(
+      changedFiles(base, head),
+      readProjectsAt(base),
+      current.projects ?? [],
+      discoverTokenProjects(root).map((project) => project.id),
+    );
   }
+  emit("TOKEN_PROJECTS", result.affected.join(","));
+  emit("TOKEN_VALIDATION_PROJECTS", result.validation.join(","));
+  report("Affected token projects", result.affected);
+  report("Token projects selected for validation", result.validation);
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
 }
 
+function changedFiles(base: string, head: string): string[] {
+  return execFileSync("git", ["diff", "--name-only", base, head], {
+    cwd: root,
+    encoding: "utf8",
+  })
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
 function commitExists(ref: string): boolean {
   try {
     execFileSync("git", ["cat-file", "-e", `${ref}^{commit}`], {
-      cwd: rootDir,
+      cwd: root,
       stdio: "ignore",
     });
     return true;
@@ -176,57 +66,33 @@ function commitExists(ref: string): boolean {
     return false;
   }
 }
-
-function isZeroCommit(ref: string): boolean {
-  return /^0{40}$/.test(ref);
-}
-
-function readJsonAtRef<T>(ref: string, filePath: string): T | null {
+function readProjectsAt(ref: string): TokenProject[] {
   try {
-    const content = execFileSync("git", ["show", `${ref}:${filePath}`], {
-      cwd: rootDir,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    return JSON.parse(content) as T;
+    return (
+      (
+        JSON.parse(
+          execFileSync("git", ["show", `${ref}:projects.config.json`], {
+            cwd: root,
+            encoding: "utf8",
+          }),
+        ) as ProjectsConfig
+      ).projects ?? []
+    );
   } catch {
-    return null;
+    return [];
   }
 }
-
-function stableStringify(value: unknown): string {
-  if (value === undefined) return "";
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
-  }
-
-  const object = value as Record<string, unknown>;
-  return `{${Object.keys(object)
-    .sort()
-    .map((key) => `${JSON.stringify(key)}:${stableStringify(object[key])}`)
-    .join(",")}}`;
-}
-
-function getArgValue(name: string): string | undefined {
+function arg(name: string): string | undefined {
   const prefix = `${name}=`;
-  const value = process.argv.find((arg) => arg.startsWith(prefix));
-  return value ? value.slice(prefix.length) : undefined;
+  return process.argv
+    .find((value) => value.startsWith(prefix))
+    ?.slice(prefix.length);
 }
-
-function emitGithubEnv(name: string, value: string): void {
-  if (process.env.GITHUB_ENV) {
-    fs.appendFileSync(process.env.GITHUB_ENV, `${name}=${value}\n`);
-  } else {
-    console.log(`${name}=${value}`);
-  }
+function emit(envName: string, value: string): void {
+  if (process.env.GITHUB_ENV)
+    fs.appendFileSync(process.env.GITHUB_ENV, `${envName}=${value}\n`);
+  else console.log(`${envName}=${value}`);
 }
-
-function hasStderr(error: unknown): error is { stderr: unknown } {
-  return Boolean(
-    error &&
-    typeof error === "object" &&
-    "stderr" in error &&
-    (error as { stderr?: unknown }).stderr,
-  );
+function report(label: string, values: string[]): void {
+  console.log(`${label}: ${values.length ? values.join(", ") : "none"}`);
 }

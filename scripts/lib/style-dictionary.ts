@@ -4,7 +4,7 @@ import {
   tokenSetFromFlatTokens,
   type ResolvedTokenGraph,
   type TokenLeaf,
-} from "@eknvn/token-validator";
+} from "@ekinotech/design-token-validator";
 import { writeFile } from "./token-utils.js";
 
 const GENERATED_FILE_HEADER =

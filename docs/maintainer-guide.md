@@ -1,33 +1,11 @@
 # Maintainer guide
 
-## Review the contract
+1. Review canonical intent and affected-project previews before merge.
+2. Run validation, type checking, package generation, and Storybook generation.
+3. Inspect package metadata, CSS exports, and Storybook output.
+4. Test the `.tgz` in a clean temporary consumer.
+5. Update the project version and changelog, then inspect the local `.tgz`, full `.zip`, `BUILD_INFO.json`, and checksums before creating the tag.
 
-For token changes, check stable Theme IDs, Set order, Set states, references, and the number of Theme combinations. Project configuration must contain only `id`, `tokenFile`, and `outputDir`. Theme setup does not belong there.
+Central records its commit SHA in generated project metadata. A shared tooling change may affect every project.
 
-For build changes, check output path conflicts, CSS name conflicts, selectors, reference output, stable JSON, and manifest data. For delivery changes, check the target repository, branch, source, safe destinations, and listed file types.
-
-## Add a project
-
-Check that:
-
-- a present `tokens.json` passes shared submission validation;
-- project ID and output folder are unique and safe;
-- target `source` is the same as project `outputDir`;
-- target destinations do not overlap;
-- two builds create the same output tree;
-- dry-run shows only expected files;
-- target maintainers understand `data-color-scheme` and the pull-request process.
-
-A registered project may wait for its first `tokens.json`. Central skips it until the file exists.
-
-## Release proof
-
-Use Node 22. Run tests, typecheck, token validation, artifact build, and delivery dry-run. Keep CI logs and Central artifacts long enough to investigate target problems.
-
-A small green test is not enough for a change to selectors, paths, manifests, or delivery.
-
-## Incidents and recovery
-
-Stop delivery if output or mappings are unclear. Find the owning canonical or build change. Fix it through a reviewed pull request, rebuild, and create a new target delivery.
-
-Do not patch generated target CSS by hand. The next delivery replaces it.
+Do not create a GitHub Release for Central itself, publish Central to npm, or add target credentials. A project-output release starts only from a reviewed `<project-id>-v<version>` tag.

@@ -1,0 +1,66 @@
+name: Release Project Tokens
+
+on:
+  push:
+    tags:
+      - "*-v*.*.*"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v7
+        with: { node-version: 22, cache: npm }
+      - name: Configure Validator registry
+        env:
+          GITLAB_HOST: ${{ vars.GITLAB_HOST }}
+          GITLAB_NPM_TOKEN: ${{ secrets.GITLAB_NPM_TOKEN }}
+          VALIDATOR_PROJECT_ID: ${{ vars.VALIDATOR_PROJECT_ID }}
+        run: |
+          set -eu
+          test -n "$GITLAB_HOST"
+          test -n "$GITLAB_NPM_TOKEN"
+          test -n "$VALIDATOR_PROJECT_ID"
+          case "$GITLAB_HOST" in *[/:[:space:]]*) exit 1;; esac
+          REGISTRY_PATH="${GITLAB_HOST}/api/v4/projects/${VALIDATOR_PROJECT_ID}/packages/npm/"
+          printf '%s\n' \
+            "@ekinotech:registry=https://${REGISTRY_PATH}" \
+            "//${REGISTRY_PATH}:_authToken=${GITLAB_NPM_TOKEN}" > .npmrc
+      - run: npm ci
+      - name: Remove Validator registry credentials
+        if: always()
+        run: rm -f .npmrc
+      - name: Validate project tag and changelog
+        run: |
+          npm run release:info -- --tag="${GITHUB_REF_NAME}"
+          echo "PROJECT_ID=$(node -p "require('./release-metadata/release-info.json').projectId")" >> "$GITHUB_ENV"
+          echo "VERSION=$(node -p "require('./release-metadata/release-info.json').version")" >> "$GITHUB_ENV"
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run validate:tokens -- --project="$PROJECT_ID"
+      - name: Build selected project package and ZIP
+        run: npm run build:project-release -- --project="$PROJECT_ID" --version="$VERSION" --source-commit="${GITHUB_SHA}"
+      - name: Publish project package to GitHub Packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s\n' \
+            "@ekinotech:registry=https://npm.pkg.github.com" \
+            "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" > .npmrc
+          npm publish "dist/${PROJECT_ID}/package" \
+            --registry=https://npm.pkg.github.com
+          rm -f .npmrc
+      - name: Create project ZIP release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ env.PROJECT_ID }} Design Tokens v${{ env.VERSION }}
+          body_path: release-metadata/release-notes.md
+          files: dist/${{ env.PROJECT_ID }}/artifacts/design-tokens-${{ env.PROJECT_ID }}-v${{ env.VERSION }}.zip
+          fail_on_unmatched_files: true

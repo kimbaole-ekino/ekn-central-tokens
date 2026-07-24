@@ -3,8 +3,8 @@ import path from "node:path";
 import {
   parseTokenDocument,
   validateTokenDocument as validateSharedTokenDocument,
-} from "@eknvn/token-validator";
-import type { ProjectsConfig, TargetsConfig, TokenDocument } from "./types.js";
+} from "@ekinotech/design-token-validator";
+import type { ProjectsConfig, TokenDocument } from "./types.js";
 
 export function readJson<T = unknown>(filePath: string): T {
   return JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
@@ -25,9 +25,6 @@ export function writeFile(filePath: string, content: string): void {
 }
 export function getProjectsConfig(rootDir: string): ProjectsConfig {
   return readJson(path.join(rootDir, "projects.config.json"));
-}
-export function getTargetsConfig(rootDir: string): TargetsConfig {
-  return readJson(path.join(rootDir, "targets.config.json"));
 }
 export function validateTokenDocument(
   document: TokenDocument,
